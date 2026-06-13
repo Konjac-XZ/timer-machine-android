@@ -296,6 +296,8 @@ class EditSchedulerFragment : Fragment(R.layout.fragment_edit_scheduler), MenuPr
         menuInflater.inflate(R.menu.edit_scheduler, menu)
     }
 
+    override fun onPrepareMenu(menu: Menu) = Unit
+
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
         return when (menuItem.itemId) {
             R.id.action_save_scheduler -> {
