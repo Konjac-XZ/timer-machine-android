@@ -352,6 +352,12 @@ internal class VolcengineTtsClient(
         while (reader.peek() != JsonReader.Token.END_DOCUMENT) {
             val frame = reader.readJsonValue() as? Map<*, *> ?: continue
             frameCount++
+            logResponseFrame(
+                source = "chunked",
+                frame = frameCount.toString(),
+                event = frame["event"]?.toString(),
+                data = frame,
+            )
             val hasAudio = frame["data"] is String
             if (hasAudio) {
                 val data = frame["data"] as String
@@ -415,6 +421,12 @@ internal class VolcengineTtsClient(
             val frame = JsonReader.of(Buffer().writeUtf8(data)).apply {
                 isLenient = true
             }.readJsonValue() as? Map<*, *> ?: return
+            logResponseFrame(
+                source = "sse",
+                frame = eventCount.toString(),
+                event = eventName,
+                data = frame,
+            )
 
             val hasAudio = frame["data"] is String
             if (hasAudio) {
@@ -677,6 +689,25 @@ internal class VolcengineTtsClient(
             )
     }
 
+    private fun logResponseFrame(
+        source: String,
+        frame: String,
+        event: String?,
+        data: Map<*, *>,
+    ) {
+        val text = "Parsed $source response frame: frame=$frame event=$event data=${data.debugFrameForLog()}"
+        text.chunked(LOG_CHUNK_SIZE).forEachIndexed { index, chunk ->
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "Response frame detail part=%d/%d %s",
+                    index + 1,
+                    (text.length + LOG_CHUNK_SIZE - 1) / LOG_CHUNK_SIZE,
+                    chunk,
+                )
+        }
+    }
+
     private fun Any?.debugValueForLog(): String {
         return when (this) {
             null -> "null"
@@ -684,6 +715,17 @@ internal class VolcengineTtsClient(
             is Map<*, *> -> debugMapForLog()
             is List<*> -> joinToString(separator = "|", prefix = "[", postfix = "]") { it.debugValueForLog() }
             else -> toString()
+        }
+    }
+
+    private fun Map<*, *>.debugFrameForLog(): String {
+        return entries.joinToString(separator = ",", prefix = "{", postfix = "}") { (key, value) ->
+            val displayValue = if (key == "data" && value is String) {
+                "base64(length=${value.length})"
+            } else {
+                value.debugValueForLog()
+            }
+            "$key=$displayValue"
         }
     }
 
@@ -778,6 +820,7 @@ internal class VolcengineTtsClient(
         const val DEBUG_WORDS_RADIUS = 5
         const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
         const val TIMESTAMP_MILLIS_THRESHOLD = 1000
+        const val LOG_CHUNK_SIZE = 3000
         const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
         const val MAX_CONCURRENT_TIMED_REQUESTS = 1
 
