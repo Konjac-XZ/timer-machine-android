@@ -87,6 +87,19 @@ class OneFragment :
             }
         )
 
+        binding.textOneTime.setOnClickListener {
+            val state = viewModel.timerCurrentState.value
+            if (state?.isRunning == true) return@setOnClickListener
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !context.hasPermissions(Manifest.permission.POST_NOTIFICATIONS) &&
+                !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+            ) {
+                postNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                actionStartPause()
+            }
+        }
+
         viewModel.messageEvent.observeEvent(viewLifecycleOwner) {
             when (it) {
                 RBase.string.one_ui_locked -> {
