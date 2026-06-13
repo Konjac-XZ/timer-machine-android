@@ -333,16 +333,22 @@ object TtsBakery {
             runCatching {
                 cloudTtsClient.synthesizeTimedSpeech(pendingTexts)
             }.onSuccess { timedSpeechList ->
+                val timedSpeechByText = timedSpeechList.associateBy { it.text }
+                val returnedTexts = timedSpeechByText.keys
+                val missingTexts = pendingTexts.filterNot { it in returnedTexts }
                 Timber
                     .tag(TTS_LOG_TAG)
                     .i(
-                        "Cloud batch bake synthesized: pending=%d returned=%d",
+                        "Cloud batch bake synthesized: pending=%d returned=%d missing=%d returnedTexts=%s missingTexts=%s",
                         pendingTexts.size,
                         timedSpeechList.size,
+                        missingTexts.size,
+                        returnedTexts.joinToString(separator = "|"),
+                        missingTexts.joinToString(separator = "|"),
                     )
-                pendingTexts.forEachIndexed { index, text ->
+                pendingTexts.forEach { text ->
                     runCatching {
-                        val timedSpeech = timedSpeechList.getOrNull(index)
+                        val timedSpeech = timedSpeechByText[text]
                             ?: error("Missing synthesized audio for $text")
                         val file = createTempSpeechFile(context)
                         file.writeWav(

@@ -78,19 +78,17 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis response: audioBytes=%d sentences=%d words=%d wordsPreview=%s",
+                "Timed synthesis response: audioBytes=%d sentences=%d words=%d firstSentence=%s lastSentence=%s wordsPreview=%s",
                 synthesisResult.audio.size,
                 synthesisResult.subtitles.size,
                 words.size,
-                words.take(20).joinToString(separator = "|") { it.word },
+                synthesisResult.subtitles.firstOrNull()?.debugText,
+                synthesisResult.subtitles.lastOrNull()?.debugText,
+                words.debugWordsAround(index = 0),
             )
-        check(words.size >= texts.size) {
-            "Expected at least ${texts.size} subtitle words, got ${words.size}; " +
-                "sentences=${synthesisResult.subtitles.size}"
-        }
-
         var wordIndex = 0
-        requests.map { request ->
+        requests.mapNotNull { request ->
+            val startWordIndex = wordIndex
             val matchedWords = mutableListOf<SubtitleWord>()
             var matchedText = ""
             while (wordIndex < words.size && matchedText != request.normalizedText) {
@@ -98,8 +96,20 @@ internal class VolcengineTtsClient(
                 matchedWords += word
                 matchedText += word.normalizedWord
             }
-            check(matchedWords.isNotEmpty() && matchedText == request.normalizedText) {
-                "Subtitle word mismatch: expected=${request.text}, actual=$matchedText"
+            if (matchedWords.isEmpty() || matchedText != request.normalizedText) {
+                Timber
+                    .tag(TTS_LOG_TAG)
+                    .w(
+                        "Timed synthesis subtitle mismatch: text=%s normalized=%s actual=%s startWordIndex=%d endWordIndex=%d words=%d nearbyWords=%s",
+                        request.text,
+                        request.normalizedText,
+                        matchedText,
+                        startWordIndex,
+                        wordIndex,
+                        words.size,
+                        words.debugWordsAround(startWordIndex),
+                    )
+                return@mapNotNull null
             }
             TimedSpeech(
                 text = request.text,
@@ -111,8 +121,11 @@ internal class VolcengineTtsClient(
                     Timber
                         .tag(TTS_LOG_TAG)
                         .i(
-                            "Timed synthesis slice: text=%s words=%s start=%.3f end=%.3f bytes=%d",
+                            "Timed synthesis slice: text=%s normalized=%s wordRange=%d..%d words=%s start=%.3f end=%.3f bytes=%d",
                             request.text,
+                            request.normalizedText,
+                            startWordIndex,
+                            wordIndex - 1,
                             matchedWords.joinToString(separator = "|") { it.word },
                             matchedWords.first().startTime,
                             matchedWords.last().endTime,
@@ -319,6 +332,18 @@ internal class VolcengineTtsClient(
     private val SubtitleWord.normalizedWord: String
         get() = normalizeSubtitleText(word)
 
+    private val Subtitle.debugText: String
+        get() = "text=$text words=${words.joinToString(separator = "|") { it.word }}"
+
+    private fun List<SubtitleWord>.debugWordsAround(index: Int): String {
+        if (isEmpty()) return ""
+        val start = (index - DEBUG_WORDS_RADIUS).coerceAtLeast(0)
+        val end = (index + DEBUG_WORDS_RADIUS).coerceAtMost(size)
+        return subList(start, end).joinToString(separator = "|") { word ->
+            "${word.word}@${"%.3f".format(word.startTime)}-${"%.3f".format(word.endTime)}"
+        }
+    }
+
     private fun ByteArray.slicePcmBySeconds(
         startSeconds: Double,
         endSeconds: Double,
@@ -393,6 +418,7 @@ internal class VolcengineTtsClient(
         const val SILENCE_THRESHOLD = 256
         const val TRIM_PADDING_MILLIS = 20
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
+        const val DEBUG_WORDS_RADIUS = 5
 
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
