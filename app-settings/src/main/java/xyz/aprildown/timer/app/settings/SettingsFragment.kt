@@ -483,7 +483,7 @@ private const val KEY_TTS_BAKERY = PreferenceData.PREF_IS_TTS_BAKERY_OPEN
 private const val KEY_TTS_PRERENDER = "key_tts_prerender"
 private const val KEY_TTS_CLEAR_CACHE = "key_tts_clear_cache"
 private const val KEY_CLOUD_TTS_SETTINGS = "key_cloud_tts_settings"
-private const val DEFAULT_TTS_PRERENDER_COUNT = 300
+private const val DEFAULT_TTS_PRERENDER_COUNT = 60
 private const val MAX_TTS_PRERENDER_COUNT = 300
 
 private const val KEY_PHONE_CALL = PreferenceData.KEY_PHONE_CALL
