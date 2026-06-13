@@ -692,14 +692,16 @@
 
     <string name="pref_tts_prerender_title">Pre-render countdown audio</string>
     <string name="pref_tts_prerender_dialog_title">Pre-render Count</string>
-    <string name="pref_tts_prerender_dialog_message">Enter the maximum countdown number to pre-render. Rendering will start 3 seconds after you confirm.</string>
+    <string name="pref_tts_prerender_dialog_message">Enter the maximum countdown number to pre-render.</string>
     <string name="pref_tts_prerender_dialog_hint">Maximum count</string>
-    <string name="pref_tts_prerender_starting">Starting TTS rendering in 3 seconds…</string>
     <string name="pref_tts_prerender_progress">Rendering audio %1$d of %2$d…</string>
     <string name="pref_tts_prerender_completed">Rendered %1$d of %2$d audio files</string>
     <string name="pref_tts_prerender_completed_with_failures">Rendered %1$d of %2$d audio files; %3$d failed</string>
     <string name="pref_tts_prerender_failed">Unable to start TTS rendering</string>
+    <string name="pref_tts_prerender_already_running">TTS rendering is already running</string>
     <string name="pref_tts_prerender_invalid_input">Please enter a number between 1 and 300</string>
+    <string name="pref_tts_prerender_notification_title">Pre-rendering countdown audio</string>
+    <string name="pref_tts_prerender_notification_progress">Rendering %1$d of %2$d</string>
 
     <string name="pref_media_style_notification">Media Style Notification</string>
 

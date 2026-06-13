@@ -7,6 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
@@ -14,16 +17,17 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import com.github.deweyreed.timer.component.tts.TtsBakery
+import com.github.deweyreed.tools.anko.dp
 import com.github.deweyreed.tools.anko.longSnackbar
 import com.github.deweyreed.tools.helper.IntentHelper
 import com.github.deweyreed.tools.helper.createChooserIntentIfDead
 import com.github.deweyreed.tools.helper.hasPermissions
 import com.github.deweyreed.tools.helper.startActivityOrNothing
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import xyz.aprildown.timer.app.base.data.DarkTheme
 import xyz.aprildown.timer.app.base.data.FlavorData
 import xyz.aprildown.timer.app.base.data.PreferenceData
@@ -62,6 +66,7 @@ class SettingsFragment :
     lateinit var flavorUiInjector: Optional<FlavorUiInjector>
 
     private var sharedPreferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+    private var ttsPrerenderDialogJob: Job? = null
 
     private val phoneStateLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -332,44 +337,87 @@ class SettingsFragment :
     }
 
     private fun startTtsPrerendering(count: Int) {
-        val appContext = requireContext().applicationContext
-        view?.longSnackbar(RBase.string.pref_tts_prerender_starting)
+        if (TtsBakery.startCountdownPrerendering(requireContext(), count)) {
+            showTtsPrerenderProgressDialog()
+        } else {
+            view?.longSnackbar(RBase.string.pref_tts_prerender_already_running)
+            showTtsPrerenderProgressDialog()
+        }
+    }
 
-        lifecycleScope.launch {
-            delay(3000)
+    private fun showTtsPrerenderProgressDialog() {
+        ttsPrerenderDialogJob?.cancel()
 
-            withContext(Dispatchers.IO) {
-                TtsBakery.bakeMultipleImmediately(
-                    context = appContext,
-                    texts = (count downTo 1).map(Int::toString)
-                ) { current, total ->
-                    if (current % 10 == 0 || current == total) {
-                        launch(Dispatchers.Main.immediate) {
-                            view?.longSnackbar(
-                                getString(RBase.string.pref_tts_prerender_progress, current, total)
+        val dialogView = layoutInflater.inflate(
+            android.R.layout.simple_list_item_2,
+            null,
+            false,
+        )
+        val titleView = dialogView.findViewById<TextView>(android.R.id.text1)
+        val progressTextView = dialogView.findViewById<TextView>(android.R.id.text2)
+        val progressBar = ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(RBase.string.pref_tts_prerender_title)
+            .setView(
+                LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    val padding = requireContext().dp(24).toInt()
+                    setPadding(padding, padding, padding, 0)
+                    addView(dialogView)
+                    addView(progressBar)
+                }
+            )
+            .setPositiveButton(RBase.string.ok, null)
+            .create()
+
+        dialog.setOnDismissListener {
+            ttsPrerenderDialogJob?.cancel()
+            ttsPrerenderDialogJob = null
+        }
+        dialog.show()
+
+        ttsPrerenderDialogJob = viewLifecycleOwner.lifecycleScope.launch {
+            TtsBakery.countdownPrerenderState.collectLatest { state ->
+                when (state) {
+                    TtsBakery.CountdownPrerenderState.Idle -> Unit
+                    is TtsBakery.CountdownPrerenderState.Running -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_notification_title)
+                        progressTextView.text = getString(
+                            RBase.string.pref_tts_prerender_progress,
+                            state.current,
+                            state.total,
+                        )
+                        progressBar.max = state.total
+                        progressBar.progress = state.current
+                        progressBar.isIndeterminate = state.total == 0
+                    }
+                    is TtsBakery.CountdownPrerenderState.Complete -> {
+                        titleView.text = if (state.failed == 0) {
+                            getString(
+                                RBase.string.pref_tts_prerender_completed,
+                                state.success,
+                                state.total,
+                            )
+                        } else {
+                            getString(
+                                RBase.string.pref_tts_prerender_completed_with_failures,
+                                state.success,
+                                state.total,
+                                state.failed,
                             )
                         }
+                        progressTextView.text = null
+                        progressBar.max = state.total
+                        progressBar.progress = state.success
+                        progressBar.isIndeterminate = false
+                    }
+                    TtsBakery.CountdownPrerenderState.FailedToStart -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_failed)
+                        progressTextView.text = null
+                        progressBar.isIndeterminate = false
                     }
                 }
-            }.onSuccess { result ->
-                view?.longSnackbar(
-                    if (result.failed == 0) {
-                        getString(
-                            RBase.string.pref_tts_prerender_completed,
-                            result.success,
-                            result.total,
-                        )
-                    } else {
-                        getString(
-                            RBase.string.pref_tts_prerender_completed_with_failures,
-                            result.success,
-                            result.total,
-                            result.failed,
-                        )
-                    }
-                )
-            }.onFailure {
-                view?.longSnackbar(RBase.string.pref_tts_prerender_failed)
             }
         }
     }

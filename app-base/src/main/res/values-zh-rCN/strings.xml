@@ -503,6 +503,18 @@
     <string name="pref_tts_bakery">文字转语音缓存</string>
     <string name="pref_tts_bakery_off">生成每次文字转语音的语音文件，用于之后快速发声</string>
     <string name="pref_tts_bakery_on">如文字转语音出错或失效，请尝试关闭该选项</string>
+    <string name="pref_tts_prerender_title">预生成倒数语音</string>
+    <string name="pref_tts_prerender_dialog_title">预生成数量</string>
+    <string name="pref_tts_prerender_dialog_message">输入要预生成的最大倒数数字</string>
+    <string name="pref_tts_prerender_dialog_hint">最大数字</string>
+    <string name="pref_tts_prerender_progress">正在生成第 %1$d/%2$d 个语音…</string>
+    <string name="pref_tts_prerender_completed">已生成 %1$d/%2$d 个语音文件</string>
+    <string name="pref_tts_prerender_completed_with_failures">已生成 %1$d/%2$d 个语音文件；%3$d 个失败</string>
+    <string name="pref_tts_prerender_failed">无法开始生成文字转语音缓存</string>
+    <string name="pref_tts_prerender_already_running">文字转语音缓存正在生成中</string>
+    <string name="pref_tts_prerender_invalid_input">请输入 1 到 300 之间的数字</string>
+    <string name="pref_tts_prerender_notification_title">正在预生成倒数语音</string>
+    <string name="pref_tts_prerender_notification_progress">正在生成 %1$d/%2$d</string>
     <string name="pref_media_style_notification">媒体样式通知</string>
     <!--Reminder preferences-->
     <string name="pref_reminder">提醒方式</string>

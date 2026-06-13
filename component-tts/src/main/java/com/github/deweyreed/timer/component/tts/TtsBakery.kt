@@ -1,18 +1,36 @@
 package com.github.deweyreed.timer.component.tts
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
+import xyz.aprildown.timer.app.base.R
+import xyz.aprildown.timer.domain.utils.Constants
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,6 +39,32 @@ import kotlin.coroutines.resumeWithException
 
 object TtsBakery {
     private const val SYNTHESIZE_TIMEOUT_MILLIS = 20_000L
+    private const val COUNTDOWN_PRERENDER_NOTIFICATION_ID = Constants.NOTIF_ID_APP_INFO - 1
+
+    private val prerenderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var prerenderJob: Job? = null
+    private val mutableCountdownPrerenderState =
+        MutableStateFlow<CountdownPrerenderState>(CountdownPrerenderState.Idle)
+
+    val countdownPrerenderState: StateFlow<CountdownPrerenderState> =
+        mutableCountdownPrerenderState.asStateFlow()
+
+    sealed interface CountdownPrerenderState {
+        data object Idle : CountdownPrerenderState
+
+        data class Running(
+            val current: Int,
+            val total: Int,
+        ) : CountdownPrerenderState
+
+        data class Complete(
+            val total: Int,
+            val success: Int,
+            val failed: Int,
+        ) : CountdownPrerenderState
+
+        data object FailedToStart : CountdownPrerenderState
+    }
 
     data class BatchBakeResult(
         val total: Int,
@@ -47,6 +91,96 @@ object TtsBakery {
                     )
                     .build()
             )
+    }
+
+    fun startCountdownPrerendering(context: Context, count: Int): Boolean {
+        if (prerenderJob?.isActive == true) return false
+
+        val appContext = context.applicationContext
+        val texts = (count downTo 1).map(Int::toString)
+        mutableCountdownPrerenderState.value = CountdownPrerenderState.Running(
+            current = 0,
+            total = texts.size,
+        )
+        notifyCountdownPrerenderProgress(appContext, current = 0, total = texts.size)
+        prerenderJob = prerenderScope.launch {
+            bakeMultipleImmediately(
+                context = appContext,
+                texts = texts,
+            ) { current, total ->
+                mutableCountdownPrerenderState.value = CountdownPrerenderState.Running(
+                    current = current,
+                    total = total,
+                )
+                notifyCountdownPrerenderProgress(appContext, current = current, total = total)
+            }.onSuccess { result ->
+                mutableCountdownPrerenderState.value = CountdownPrerenderState.Complete(
+                    total = result.total,
+                    success = result.success,
+                    failed = result.failed,
+                )
+                cancelCountdownPrerenderNotification(appContext)
+            }.onFailure {
+                mutableCountdownPrerenderState.value = CountdownPrerenderState.FailedToStart
+                cancelCountdownPrerenderNotification(appContext)
+            }
+        }
+        return true
+    }
+
+    private fun notifyCountdownPrerenderProgress(context: Context, current: Int, total: Int) {
+        if (!context.canPostNotifications()) return
+
+        val notificationManager = NotificationManagerCompat.from(context)
+        notificationManager.createAppInfoChannelIfNecessary(context)
+        notificationManager.notify(
+            COUNTDOWN_PRERENDER_NOTIFICATION_ID,
+            NotificationCompat.Builder(context, Constants.CHANNEL_APP_INFO_NOTIFICATION)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.pref_tts_prerender_notification_title))
+                .setContentText(
+                    context.getString(
+                        R.string.pref_tts_prerender_notification_progress,
+                        current,
+                        total,
+                    )
+                )
+                .setProgress(total, current, total == 0)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setLocalOnly(true)
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+        )
+    }
+
+    private fun cancelCountdownPrerenderNotification(context: Context) {
+        NotificationManagerCompat.from(context).cancel(COUNTDOWN_PRERENDER_NOTIFICATION_ID)
+    }
+
+    private fun NotificationManagerCompat.createAppInfoChannelIfNecessary(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (getNotificationChannel(Constants.CHANNEL_APP_INFO_NOTIFICATION) != null) return
+
+        createNotificationChannel(
+            NotificationChannel(
+                Constants.CHANNEL_APP_INFO_NOTIFICATION,
+                context.getString(R.string.notif_channel_app_info_title),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = context.getString(R.string.notif_channel_app_info_desp)
+                setSound(null, null)
+            }
+        )
+    }
+
+    private fun Context.canPostNotifications(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
     }
 
     suspend fun bakeMultipleImmediately(
