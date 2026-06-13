@@ -87,6 +87,13 @@ object TtsBakery {
         return TtsBakeryDiskCache.get(context, text)
     }
 
+    internal fun getSpeechFileWithStatus(
+        context: Context,
+        text: String,
+    ): TtsBakeryDiskCache.LookupResult {
+        return TtsBakeryDiskCache.getWithStatus(context, text)
+    }
+
     fun scheduleBaking(context: Context, text: String) {
         if (text.isBlank()) return
         WorkManager.getInstance(context)

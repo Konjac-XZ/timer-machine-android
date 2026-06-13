@@ -243,6 +243,18 @@
     <string name="voice_variable_other_clock_time_desp">Current clock time</string>
 
     <string name="tts_error_template">TextToSpeech error: %s</string>
+    <string name="tts_local_reason_template">Using device TTS: %s</string>
+    <string name="tts_local_reason_separator">; </string>
+    <string name="tts_local_reason_cache_disabled">TTS cache is disabled</string>
+    <string name="tts_local_reason_cache_missing">no cached cloud TTS audio was found</string>
+    <string name="tts_local_reason_original_cache_invalid">the cache for the original countdown text is invalid</string>
+    <string name="tts_local_reason_speech_cache_invalid">the cache for the localized countdown text is invalid</string>
+    <string name="tts_local_reason_cache_read_error">cache could not be read: %s</string>
+    <string name="tts_local_reason_baked_count_disabled">built-in countdown audio is disabled</string>
+    <string name="tts_local_reason_baked_count_missing">built-in countdown audio file is missing</string>
+    <string name="tts_cache_hit_original">cached audio matched the original countdown text</string>
+    <string name="tts_cache_hit_speech">cached audio matched the localized countdown text</string>
+    <string name="tts_baked_count_hit">built-in countdown audio matched</string>
 
     <string name="behaviour_beep">Beep</string>
     <string name="behaviour_beep_help">Play a beep every second</string>

@@ -16,6 +16,7 @@ import androidx.core.net.toUri
 import androidx.core.os.postDelayed
 import com.github.deweyreed.timer.component.tts.TtsSpeaker.onDone
 import com.github.deweyreed.tools.anko.longToast
+import com.github.deweyreed.tools.anko.toast
 import com.github.deweyreed.tools.helper.HandlerHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -280,6 +281,8 @@ private class WelcomingTextToSpeech(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speakToken = 0L
     private var cachedDoneRunnable: Runnable? = null
+    private var lastLocalCountdownToastNumber: Int? = null
+    private var lastLocalCountdownToastAt: Long = 0L
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
@@ -334,9 +337,10 @@ private class WelcomingTextToSpeech(
             Timber
                 .tag(TTS_LOG_TAG)
                 .i(
-                    "Countdown TTS source=%s reason=%s text=%s speechText=%s bakeryOpen=%s",
+                    "Countdown TTS source=%s reason=%s userReason=%s text=%s speechText=%s bakeryOpen=%s",
                     speechSource.sourceName,
                     speechSource.reason,
+                    speechSource.userReason,
                     textString,
                     speechText,
                     isTtsBakeryOpen,
@@ -419,6 +423,14 @@ private class WelcomingTextToSpeech(
                 COUNTDOWN_TTS_LOG_TAG,
                 "WelcomingTts.local SPEAK text=${textString.toLogText()} speechText=${speechText.toLogText()}"
             )
+            if (shouldShowLocalReasonToast(textString)) {
+                application.toast(
+                    application.getString(
+                        R.string.tts_local_reason_template,
+                        speechSource.userReason,
+                    )
+                )
+            }
             textToSpeech.speak(
                 speechText,
                 TextToSpeech.QUEUE_FLUSH,
@@ -451,12 +463,25 @@ private class WelcomingTextToSpeech(
         cachedDoneRunnable?.let(mainHandler::removeCallbacks)
         cachedDoneRunnable = null
     }
+
+    private fun shouldShowLocalReasonToast(text: String): Boolean {
+        val number = text.toCountdownNumberOrNull() ?: return false
+        val now = System.currentTimeMillis()
+        val lastNumber = lastLocalCountdownToastNumber
+        val isSameCountdown = lastNumber != null &&
+            number == lastNumber - 1 &&
+            now - lastLocalCountdownToastAt <= COUNTDOWN_TOAST_SEQUENCE_GAP_MS
+        lastLocalCountdownToastNumber = number
+        lastLocalCountdownToastAt = now
+        return !isSameCountdown
+    }
 }
 
 private data class SpeechSource(
     val uri: Uri?,
     val sourceName: String,
     val reason: String,
+    val userReason: String,
 )
 
 private fun resolveSpeechSource(
@@ -465,56 +490,138 @@ private fun resolveSpeechSource(
     speechText: String,
     isTtsBakeryOpen: Boolean,
 ): SpeechSource {
+    val reasons = mutableListOf<String>()
+    val userReasons = mutableListOf<String>()
     if (isTtsBakeryOpen) {
-        val originalCacheFile = TtsBakery.getSpeechFile(context, originalText)
-        if (originalCacheFile != null) {
+        reasons += "ttsBakeryOpen=true"
+
+        val originalCacheResult = TtsBakery.getSpeechFileWithStatus(context, originalText)
+        originalCacheResult.toReasonPart("originalText")?.let(reasons::add)
+        originalCacheResult.toUserReason(context, R.string.tts_local_reason_original_cache_invalid)
+            ?.let(userReasons::add)
+        originalCacheResult.file?.let { originalCacheFile ->
             return SpeechSource(
                 uri = originalCacheFile.toUri(),
                 sourceName = "cloud-cache",
-                reason = "ttsBakeryOpen=true, originalTextCacheHit=true",
+                reason = (reasons + "originalTextCacheHit=true").joinToString(),
+                userReason = context.getString(R.string.tts_cache_hit_original),
             )
         }
 
-        val speechCacheFile = TtsBakery.getSpeechFile(context, speechText)
-        if (speechCacheFile != null) {
-            return SpeechSource(
-                uri = speechCacheFile.toUri(),
-                sourceName = "cloud-cache",
-                reason = "ttsBakeryOpen=true, speechTextCacheHit=true",
-            )
+        if (speechText != originalText) {
+            val speechCacheResult = TtsBakery.getSpeechFileWithStatus(context, speechText)
+            speechCacheResult.toReasonPart("speechText")?.let(reasons::add)
+            speechCacheResult.toUserReason(context, R.string.tts_local_reason_speech_cache_invalid)
+                ?.let(userReasons::add)
+            speechCacheResult.file?.let { speechCacheFile ->
+                return SpeechSource(
+                    uri = speechCacheFile.toUri(),
+                    sourceName = "cloud-cache",
+                    reason = (reasons + "speechTextCacheHit=true").joinToString(),
+                    userReason = context.getString(R.string.tts_cache_hit_speech),
+                )
+            }
+        } else {
+            reasons += "speechTextSameAsOriginal=true"
         }
+    } else {
+        reasons += "ttsBakeryOpen=false"
+        userReasons += context.getString(R.string.tts_local_reason_cache_disabled)
     }
 
-    val bakedCountUri = getBakedCountUri(context = context, content = originalText)
-    if (bakedCountUri != null) {
+    val bakedCountSource = getBakedCountSource(context = context, content = originalText)
+    bakedCountSource.reason?.let(reasons::add)
+    bakedCountSource.uri?.let { bakedCountUri ->
         return SpeechSource(
             uri = bakedCountUri,
             sourceName = "baked-count",
-            reason = "builtInCountAudioHit=true",
+            reason = (reasons + "builtInCountAudioHit=true").joinToString(),
+            userReason = context.getString(R.string.tts_baked_count_hit),
         )
+    }
+    bakedCountSource.userReason?.let(userReasons::add)
+
+    if (isTtsBakeryOpen &&
+        userReasons.none {
+            it == context.getString(R.string.tts_local_reason_original_cache_invalid) ||
+                it == context.getString(R.string.tts_local_reason_speech_cache_invalid)
+        }
+    ) {
+        userReasons += context.getString(R.string.tts_local_reason_cache_missing)
     }
 
     return SpeechSource(
         uri = null,
         sourceName = "local-tts",
-        reason = if (isTtsBakeryOpen) {
-            "ttsBakeryOpen=true, cloudCacheMiss=true, builtInCountAudioHit=false"
-        } else {
-            "ttsBakeryOpen=false, builtInCountAudioHit=false"
-        },
+        reason = (reasons + "source=local-tts").joinToString(),
+        userReason = userReasons.distinct().joinToString(
+            separator = context.getString(R.string.tts_local_reason_separator),
+        ),
     )
 }
 
-private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
-    if (content.length > 2) return null
-    if ((content.toString().toIntOrNull() ?: -1) !in 0..20) return null
-    if (!context.safeSharedPreference.useBakedCount) return null
+private fun TtsBakeryDiskCache.LookupResult.toReasonPart(name: String): String? {
+    return when (status) {
+        TtsBakeryDiskCache.LookupStatus.Hit -> "$name.cacheHit=true"
+        TtsBakeryDiskCache.LookupStatus.Miss -> "$name.cacheMiss=true"
+        TtsBakeryDiskCache.LookupStatus.Invalid -> "$name.cacheInvalid=true"
+        TtsBakeryDiskCache.LookupStatus.Error ->
+            "$name.cacheReadError=${errorMessage.orEmpty().toLogValue()}"
+    }
+}
+
+private fun TtsBakeryDiskCache.LookupResult.toUserReason(
+    context: Context,
+    invalidReasonRes: Int,
+): String? {
+    return when (status) {
+        TtsBakeryDiskCache.LookupStatus.Hit,
+        TtsBakeryDiskCache.LookupStatus.Miss -> null
+        TtsBakeryDiskCache.LookupStatus.Invalid -> context.getString(invalidReasonRes)
+        TtsBakeryDiskCache.LookupStatus.Error -> context.getString(
+            R.string.tts_local_reason_cache_read_error,
+            errorMessage.orEmpty().ifBlank { context.getString(R.string.unknown) },
+        )
+    }
+}
+
+private data class BakedCountSource(
+    val uri: Uri?,
+    val reason: String?,
+    val userReason: String?,
+)
+
+private fun getBakedCountSource(context: Context, content: CharSequence): BakedCountSource {
+    if (!content.isCountdownNumber()) {
+        return BakedCountSource(
+            uri = null,
+            reason = "builtInCountAudioSkipped=notCountdownNumber",
+            userReason = null,
+        )
+    }
+    if (!context.safeSharedPreference.useBakedCount) {
+        return BakedCountSource(
+            uri = null,
+            reason = "builtInCountAudioEnabled=false",
+            userReason = context.getString(R.string.tts_local_reason_baked_count_disabled),
+        )
+    }
 
     val folder = File(context.filesDir, PreferenceData.BAKED_COUNT_NAME)
     val file = File(folder, "$content.mp3")
-    if (!file.exists()) return null
+    if (!file.exists()) {
+        return BakedCountSource(
+            uri = null,
+            reason = "builtInCountAudioFileMissing=true file=${file.path.toLogValue()}",
+            userReason = context.getString(R.string.tts_local_reason_baked_count_missing),
+        )
+    }
 
-    return file.toUri()
+    return BakedCountSource(
+        uri = file.toUri(),
+        reason = null,
+        userReason = null,
+    )
 }
 
 private const val TTS_LOG_TAG = "TtsSpeaker"
@@ -522,3 +629,14 @@ private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
 private const val CACHE_PLAYBACK_DONE_FALLBACK_MS = 1_500L
 
 private fun CharSequence.toLogText(): String = "\"${toString().replace("\n", "\\n")}\""
+
+private fun String.toLogValue(): String = replace("\n", "\\n")
+
+private fun CharSequence.isCountdownNumber(): Boolean = toCountdownNumberOrNull() != null
+
+private fun CharSequence.toCountdownNumberOrNull(): Int? {
+    val number = if (length <= 2) toString().toIntOrNull() else null
+    return number?.takeIf { it in 0..20 }
+}
+
+private const val COUNTDOWN_TOAST_SEQUENCE_GAP_MS = 2_500L

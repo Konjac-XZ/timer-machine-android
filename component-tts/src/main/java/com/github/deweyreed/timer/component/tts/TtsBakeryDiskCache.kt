@@ -11,6 +11,19 @@ import java.security.MessageDigest
 internal object TtsBakeryDiskCache {
     private var diskLruCache: DiskLruCache? = null
 
+    enum class LookupStatus {
+        Hit,
+        Miss,
+        Invalid,
+        Error,
+    }
+
+    data class LookupResult(
+        val file: File?,
+        val status: LookupStatus,
+        val errorMessage: String? = null,
+    )
+
     private fun getDiskLruCache(context: Context): DiskLruCache {
         if (diskLruCache == null) {
             diskLruCache = DiskLruCache.open(
@@ -24,18 +37,34 @@ internal object TtsBakeryDiskCache {
     }
 
     fun get(context: Context, text: String): File? {
+        return getWithStatus(context, text).file
+    }
+
+    fun getWithStatus(context: Context, text: String): LookupResult {
         val key = getSpeechKey(text)
         var result: File? = null
         try {
             result = getDiskLruCache(context).get(key)?.getFile(0)
         } catch (e: IOException) {
             Timber.e(e)
+            return LookupResult(
+                file = null,
+                status = LookupStatus.Error,
+                errorMessage = e.message,
+            )
         }
         if (result != null && !isValidTtsFile(result)) {
+            Timber
+                .tag("TtsBakeryDiskCache")
+                .w("Invalid cached TTS file for text=%s file=%s", text, result)
             delete(context, text)
-            result = null
+            return LookupResult(file = null, status = LookupStatus.Invalid)
         }
-        return result
+        return if (result != null) {
+            LookupResult(file = result, status = LookupStatus.Hit)
+        } else {
+            LookupResult(file = null, status = LookupStatus.Miss)
+        }
     }
 
     private fun isValidTtsFile(file: File): Boolean {
