@@ -229,7 +229,7 @@ internal class TimerMachine(
                 )
                 count("")
             }
-            if (remainingSeconds <= times && times > 0) {
+            if (shouldReadCountdown(remainingSeconds, times)) {
                 val spokenText = remainingSeconds.toInt().toString()
                 Log.i(
                     COUNTDOWN_TTS_LOG_TAG,
@@ -255,6 +255,10 @@ internal class TimerMachine(
             }
         }
     }
+}
+
+internal fun shouldReadCountdown(remainingSeconds: Long, times: Int): Boolean {
+    return remainingSeconds in 1..times
 }
 
 private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
