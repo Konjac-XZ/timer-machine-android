@@ -22,6 +22,12 @@
 - Store strings, dimensions, and drawables in `app/src/main/res`; share UI helpers via extension functions.
 - Inject via Hilt modules in `data`/`presentation`, never through service locators.
 
+## Collaboration Notes
+- This app is maintained primarily for personal use; prefer pragmatic, easy-to-review changes over broad rewrites.
+- Explain Android and Kotlin changes clearly, assuming familiarity with older Java syntax but little Kotlin experience.
+- Keep i18n coverage to English and Simplified Chinese unless explicitly requested otherwise.
+- Unless the user says otherwise, assume the current branch is a messy, experimental branch and automatically commit completed changes.
+
 ## Testing Guidelines
 - Name unit tests `ClassNameTest` and keep fixtures beside code in `src/test`.
 - Instrumentation specs stay in `app/src/androidTest` and end with `AndroidTest`.
@@ -30,7 +36,7 @@
 - Refresh the Baseline Profile for performance work and quote macrobenchmark or profiler numbers.
 
 ## Commit & Pull Request Guidelines
-- Write imperative subjects (~55 chars) such as `Add skip-step behaviour toggle`.
+- Use Conventional Commit messages, such as `fix(tts): handle partial cloud subtitle batches`.
 - Rebase or squash so each commit is focused and free of generated files.
 - Reference issues (`Fixes #123`) and note impacted flavors or modules.
 - Attach UI screenshots or recordings and list manual validation steps.
