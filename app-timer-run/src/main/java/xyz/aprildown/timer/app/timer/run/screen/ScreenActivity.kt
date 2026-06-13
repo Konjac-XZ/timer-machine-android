@@ -88,6 +88,9 @@ class ScreenActivity : BaseActivity() {
         binding.root.clipToPadding = false
         binding.root.clipChildren = false
 
+        // Enable edge-to-edge layout
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
         windowInsetsController = WindowCompat.getInsetsController(window, binding.root)
         appliedLightStatusBars = null
         appliedLightNavigationBars = null
@@ -150,6 +153,12 @@ class ScreenActivity : BaseActivity() {
                 marginEnd = -targetInsets.right
             }
             insets
+        }
+
+        // Hide system bars for full immersive experience
+        windowInsetsController.apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
 
         @Suppress("DEPRECATION") // LOW_PROFILE only exists in old APIs.
@@ -396,6 +405,9 @@ class ScreenActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Re-hide system bars when returning to the activity
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        
         binding.imageRingtone.post {
             if (binding.imageRingtone.isVisible) {
                 binding.imageRingtone.startDrawableAnimation()
