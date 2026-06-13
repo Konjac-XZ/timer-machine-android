@@ -22,11 +22,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import xyz.aprildown.timer.app.base.R
@@ -37,11 +42,13 @@ import xyz.aprildown.tools.helper.safeSharedPreference
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object TtsBakery {
     private const val SYNTHESIZE_TIMEOUT_MILLIS = 20_000L
+    private const val CLOUD_TTS_PRERENDER_CONCURRENCY = 32
     private const val COUNTDOWN_PRERENDER_NOTIFICATION_ID = Constants.NOTIF_ID_APP_INFO - 1
 
     private val prerenderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -203,10 +210,25 @@ object TtsBakery {
             .takeIf { it.isConfigured }
             ?.let(::VolcengineTtsClient)
 
-        return try {
-            if (cloudTtsClient == null) {
-                tts = createTextToSpeech(context)
+        if (cloudTtsClient != null) {
+            return try {
+                Result.success(
+                    bakeCloudMultipleImmediately(
+                        context = context,
+                        texts = texts,
+                        cloudTtsClient = cloudTtsClient,
+                        onProgress = onProgress,
+                    )
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
             }
+        }
+
+        return try {
+            tts = createTextToSpeech(context)
             texts.forEachIndexed { index, text ->
                 val current = index + 1
                 if (text.isBlank() || TtsBakeryDiskCache.get(context, text) != null) {
@@ -216,13 +238,8 @@ object TtsBakery {
                 }
 
                 runCatching {
-                    val file = if (cloudTtsClient != null) {
-                        cloudTtsClient.synthesizeToFile(context, text)
-                    } else {
-                        val file = createTempSpeechFile(context)
-                        synthesizeToFile(checkNotNull(tts), text, file)
-                        file
-                    }
+                    val file = createTempSpeechFile(context)
+                    synthesizeToFile(checkNotNull(tts), text, file)
                     TtsBakeryDiskCache.put(context, text, file)
                 }.onSuccess {
                     successCount++
@@ -253,6 +270,48 @@ object TtsBakery {
                 shutdown()
             }
         }
+    }
+
+    private suspend fun bakeCloudMultipleImmediately(
+        context: Context,
+        texts: List<String>,
+        cloudTtsClient: VolcengineTtsClient,
+        onProgress: ((current: Int, total: Int) -> Unit)?,
+    ): BatchBakeResult = coroutineScope {
+        val semaphore = Semaphore(CLOUD_TTS_PRERENDER_CONCURRENCY)
+        val completedCount = AtomicInteger(0)
+        val successCount = AtomicInteger(0)
+        val failedCount = AtomicInteger(0)
+
+        texts.map { text ->
+            async(Dispatchers.IO) {
+                semaphore.withPermit {
+                    if (text.isBlank() || TtsBakeryDiskCache.get(context, text) != null) {
+                        successCount.incrementAndGet()
+                    } else {
+                        runCatching {
+                            val file = cloudTtsClient.synthesizeToFile(context, text)
+                            TtsBakeryDiskCache.put(context, text, file)
+                        }.onSuccess {
+                            successCount.incrementAndGet()
+                        }.onFailure { error ->
+                            if (error is CancellationException && error !is TimeoutCancellationException) {
+                                throw error
+                            }
+                            failedCount.incrementAndGet()
+                            Timber.e(error, "Failed to bake cloud TTS text: %s", text)
+                        }
+                    }
+                    onProgress?.invoke(completedCount.incrementAndGet(), texts.size)
+                }
+            }
+        }.awaitAll()
+
+        BatchBakeResult(
+            total = texts.size,
+            success = successCount.get(),
+            failed = failedCount.get(),
+        )
     }
 
     private suspend fun createTextToSpeech(context: Context): TextToSpeech {
