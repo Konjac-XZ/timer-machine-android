@@ -18,6 +18,7 @@ import com.github.deweyreed.tools.anko.longToast
 import com.github.deweyreed.tools.helper.HandlerHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import xyz.aprildown.timer.app.base.R
 import xyz.aprildown.timer.app.base.data.PreferenceData
 import xyz.aprildown.timer.app.base.data.PreferenceData.isTtsBakeryOpen
@@ -287,15 +288,26 @@ private class WelcomingTextToSpeech(
             val textString = text.toString()
             val speechText = TtsBakery.countdownSpeechText(textString)
 
-            val speechUri = withContext(Dispatchers.IO) {
-                if (isTtsBakeryOpen) {
-                    TtsBakery.getSpeechFile(application, textString)?.toUri()
-                        ?: TtsBakery.getSpeechFile(application, speechText)?.toUri()
-                        ?: getBakedCountUri(context = application, content = textString)
-                } else {
-                    getBakedCountUri(context = application, content = textString)
-                }
+            val speechSource = withContext(Dispatchers.IO) {
+                resolveSpeechSource(
+                    context = application,
+                    originalText = textString,
+                    speechText = speechText,
+                    isTtsBakeryOpen = isTtsBakeryOpen,
+                )
             }
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "Countdown TTS source=%s reason=%s text=%s speechText=%s bakeryOpen=%s",
+                    speechSource.sourceName,
+                    speechSource.reason,
+                    textString,
+                    speechText,
+                    isTtsBakeryOpen,
+                )
+
+            val speechUri = speechSource.uri
             if (speechUri != null) {
                 if (initialized) {
                     if (textToSpeech.isSpeaking) {
@@ -363,6 +375,58 @@ private class WelcomingTextToSpeech(
     }
 }
 
+private data class SpeechSource(
+    val uri: Uri?,
+    val sourceName: String,
+    val reason: String,
+)
+
+private fun resolveSpeechSource(
+    context: Context,
+    originalText: String,
+    speechText: String,
+    isTtsBakeryOpen: Boolean,
+): SpeechSource {
+    if (isTtsBakeryOpen) {
+        val originalCacheFile = TtsBakery.getSpeechFile(context, originalText)
+        if (originalCacheFile != null) {
+            return SpeechSource(
+                uri = originalCacheFile.toUri(),
+                sourceName = "cloud-cache",
+                reason = "ttsBakeryOpen=true, originalTextCacheHit=true",
+            )
+        }
+
+        val speechCacheFile = TtsBakery.getSpeechFile(context, speechText)
+        if (speechCacheFile != null) {
+            return SpeechSource(
+                uri = speechCacheFile.toUri(),
+                sourceName = "cloud-cache",
+                reason = "ttsBakeryOpen=true, speechTextCacheHit=true",
+            )
+        }
+    }
+
+    val bakedCountUri = getBakedCountUri(context = context, content = originalText)
+    if (bakedCountUri != null) {
+        return SpeechSource(
+            uri = bakedCountUri,
+            sourceName = "baked-count",
+            reason = "builtInCountAudioHit=true",
+        )
+    }
+
+    return SpeechSource(
+        uri = null,
+        sourceName = "local-tts",
+        reason = if (isTtsBakeryOpen) {
+            "ttsBakeryOpen=true, cloudCacheMiss=true, builtInCountAudioHit=false"
+        } else {
+            "ttsBakeryOpen=false, builtInCountAudioHit=false"
+        },
+    )
+}
+
 private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
     if (content.length > 2) return null
     if ((content.toString().toIntOrNull() ?: -1) !in 0..20) return null
@@ -374,3 +438,5 @@ private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
 
     return file.toUri()
 }
+
+private const val TTS_LOG_TAG = "TtsSpeaker"

@@ -48,7 +48,7 @@ import kotlin.coroutines.resumeWithException
 
 object TtsBakery {
     private const val SYNTHESIZE_TIMEOUT_MILLIS = 20_000L
-    private const val CLOUD_TTS_PRERENDER_CONCURRENCY = 32
+    private const val CLOUD_TTS_PRERENDER_CONCURRENCY = 8
     private const val COUNTDOWN_PRERENDER_NOTIFICATION_ID = Constants.NOTIF_ID_APP_INFO - 1
 
     private val prerenderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
