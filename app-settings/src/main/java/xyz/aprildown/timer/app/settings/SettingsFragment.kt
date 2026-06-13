@@ -6,17 +6,24 @@ import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.InputType
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import com.github.deweyreed.timer.component.tts.TtsBakery
+import com.github.deweyreed.tools.anko.longSnackbar
 import com.github.deweyreed.tools.helper.IntentHelper
 import com.github.deweyreed.tools.helper.createChooserIntentIfDead
 import com.github.deweyreed.tools.helper.hasPermissions
 import com.github.deweyreed.tools.helper.startActivityOrNothing
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import xyz.aprildown.timer.app.base.data.DarkTheme
 import xyz.aprildown.timer.app.base.data.FlavorData
 import xyz.aprildown.timer.app.base.data.PreferenceData
@@ -26,6 +33,7 @@ import xyz.aprildown.timer.app.base.ui.FlavorUiInjector
 import xyz.aprildown.timer.app.base.ui.FlavorUiInjectorQualifier
 import xyz.aprildown.timer.app.base.ui.MainCallback
 import xyz.aprildown.timer.app.base.utils.NavigationUtils.subLevelNavigate
+import xyz.aprildown.timer.component.key.SimpleInputDialog
 import xyz.aprildown.timer.component.settings.DarkThemeDialog
 import xyz.aprildown.timer.component.settings.TweakTimeDialog
 import xyz.aprildown.timer.domain.TimeUtils
@@ -129,6 +137,9 @@ class SettingsFragment :
             KEY_BAKED_COUNT -> {
                 flavorUiInjector.orElse(null)?.toBakedCountDialog(this)
             }
+            KEY_TTS_PRERENDER -> {
+                showTtsPrerenderDialog()
+            }
             KEY_NOTIF_SETTING -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -198,6 +209,7 @@ class SettingsFragment :
         findPreference<Preference>(KEY_FLOATING_WINDOW_PIP)?.onPreferenceClickListener = this
         findPreference<Preference>(KEY_PHONE_CALL)?.onPreferenceChangeListener = this
         findPreference<Preference>(KEY_TTS_BAKERY)?.onPreferenceChangeListener = this
+        findPreference<Preference>(KEY_TTS_PRERENDER)?.onPreferenceClickListener = this
         findPreference<ListPreference>(KEY_WEEK_START)?.run {
             val weekdays = listOf(
                 Calendar.MONDAY,
@@ -301,6 +313,67 @@ class SettingsFragment :
             screenValue != null && screenValue != getString(RBase.string.pref_screen_value_default)
     }
 
+    private fun showTtsPrerenderDialog() {
+        SimpleInputDialog(requireContext()).show(
+            titleRes = RBase.string.pref_tts_prerender_dialog_title,
+            messageRes = RBase.string.pref_tts_prerender_dialog_message,
+            hint = getString(RBase.string.pref_tts_prerender_dialog_hint),
+            preFill = DEFAULT_TTS_PRERENDER_COUNT.toString(),
+            inputType = InputType.TYPE_CLASS_NUMBER
+        ) { input ->
+            val count = input.toIntOrNull()
+            if (count == null || count !in 1..MAX_TTS_PRERENDER_COUNT) {
+                view?.longSnackbar(RBase.string.pref_tts_prerender_invalid_input)
+                return@show
+            }
+
+            startTtsPrerendering(count)
+        }
+    }
+
+    private fun startTtsPrerendering(count: Int) {
+        val appContext = requireContext().applicationContext
+        view?.longSnackbar(RBase.string.pref_tts_prerender_starting)
+
+        lifecycleScope.launch {
+            delay(3000)
+
+            withContext(Dispatchers.IO) {
+                TtsBakery.bakeMultipleImmediately(
+                    context = appContext,
+                    texts = (count downTo 1).map(Int::toString)
+                ) { current, total ->
+                    if (current % 10 == 0 || current == total) {
+                        launch(Dispatchers.Main.immediate) {
+                            view?.longSnackbar(
+                                getString(RBase.string.pref_tts_prerender_progress, current, total)
+                            )
+                        }
+                    }
+                }
+            }.onSuccess { result ->
+                view?.longSnackbar(
+                    if (result.failed == 0) {
+                        getString(
+                            RBase.string.pref_tts_prerender_completed,
+                            result.success,
+                            result.total,
+                        )
+                    } else {
+                        getString(
+                            RBase.string.pref_tts_prerender_completed_with_failures,
+                            result.success,
+                            result.total,
+                            result.failed,
+                        )
+                    }
+                )
+            }.onFailure {
+                view?.longSnackbar(RBase.string.pref_tts_prerender_failed)
+            }
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         if (sharedPreferenceListener != null) {
@@ -324,6 +397,9 @@ private const val KEY_FLOATING_WINDOW_PIP = "key_floating_window_pip"
 
 private const val KEY_BAKED_COUNT = PreferenceData.PREF_BAKED_COUNT
 private const val KEY_TTS_BAKERY = PreferenceData.PREF_IS_TTS_BAKERY_OPEN
+private const val KEY_TTS_PRERENDER = "key_tts_prerender"
+private const val DEFAULT_TTS_PRERENDER_COUNT = 300
+private const val MAX_TTS_PRERENDER_COUNT = 300
 
 private const val KEY_PHONE_CALL = PreferenceData.KEY_PHONE_CALL
 
