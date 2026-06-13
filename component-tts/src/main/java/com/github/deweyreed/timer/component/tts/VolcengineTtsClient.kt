@@ -68,11 +68,12 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis batching: texts=%d batches=%d maxSentencesPerRequest=%d maxConcurrency=%d",
+                "Timed synthesis batching: texts=%d batches=%d maxSentencesPerRequest=%d maxConcurrency=%d textsByIndex=%s",
                 requests.size,
                 batches.size,
                 MAX_SENTENCES_PER_TIMED_REQUEST,
                 MAX_CONCURRENT_TIMED_REQUESTS,
+                requests.debugRequestsByIndex(),
             )
         batches
             .mapIndexed { batchIndex, batchRequests ->
@@ -99,13 +100,15 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis batch start: batch=%d/%d count=%d first=%s last=%s chars=%d",
+                "Timed synthesis batch request: batch=%d/%d count=%d first=%s last=%s chars=%d requests=%s synthesisText=%s",
                 batchIndex + 1,
                 batchCount,
                 requests.size,
                 requests.firstOrNull()?.text,
                 requests.lastOrNull()?.text,
                 synthesisText.length,
+                requests.debugRequestsByIndex(),
+                synthesisText.escapeForLog(),
             )
         val synthesisResult = synthesize(
             text = synthesisText,
@@ -116,15 +119,14 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis batch response: batch=%d/%d audioBytes=%d sentences=%d words=%d firstSentence=%s lastSentence=%s wordsPreview=%s",
+                "Timed synthesis batch response: batch=%d/%d audioBytes=%d sentences=%d words=%d sentencesDetail=%s wordsDetail=%s",
                 batchIndex + 1,
                 batchCount,
                 synthesisResult.audio.size,
                 synthesisResult.subtitles.size,
                 words.size,
-                synthesisResult.subtitles.firstOrNull()?.debugText,
-                synthesisResult.subtitles.lastOrNull()?.debugText,
-                words.debugWordsAround(index = 0),
+                synthesisResult.subtitles.debugSubtitlesByIndex(),
+                words.debugWordsAround(index = 0, radius = DEBUG_WORDS_FULL_BATCH_RADIUS),
             )
         var wordIndex = 0
         return requests.mapNotNull { request ->
@@ -377,15 +379,37 @@ internal class VolcengineTtsClient(
         get() = normalizeSubtitleText(word)
 
     private val Subtitle.debugText: String
-        get() = "text=$text words=${words.joinToString(separator = "|") { it.word }}"
+        get() = "text=${text.escapeForLog()} words=${words.joinToString(separator = "|") { it.debugText }}"
 
-    private fun List<SubtitleWord>.debugWordsAround(index: Int): String {
+    private val SubtitleWord.debugText: String
+        get() = "${word.escapeForLog()}@${"%.3f".format(startTime)}-${"%.3f".format(endTime)}"
+
+    private fun List<TimedSpeechRequest>.debugRequestsByIndex(): String {
+        return mapIndexed { index, request ->
+            "$index:${request.text.escapeForLog()}=>${request.synthesisText.escapeForLog()}"
+        }.joinToString(separator = "|")
+    }
+
+    private fun List<Subtitle>.debugSubtitlesByIndex(): String {
+        return mapIndexed { index, subtitle ->
+            "$index:${subtitle.debugText}"
+        }.joinToString(separator = " || ")
+    }
+
+    private fun List<SubtitleWord>.debugWordsAround(
+        index: Int,
+        radius: Int = DEBUG_WORDS_RADIUS,
+    ): String {
         if (isEmpty()) return ""
-        val start = (index - DEBUG_WORDS_RADIUS).coerceAtLeast(0)
-        val end = (index + DEBUG_WORDS_RADIUS).coerceAtMost(size)
-        return subList(start, end).joinToString(separator = "|") { word ->
-            "${word.word}@${"%.3f".format(word.startTime)}-${"%.3f".format(word.endTime)}"
-        }
+        val start = (index - radius).coerceAtLeast(0)
+        val end = (index + radius).coerceAtMost(size)
+        return subList(start, end)
+            .mapIndexed { offset, word -> "${start + offset}:${word.debugText}" }
+            .joinToString(separator = "|")
+    }
+
+    private fun String.escapeForLog(): String {
+        return replace("\r", "\\r").replace("\n", "\\n")
     }
 
     private fun ByteArray.slicePcmBySeconds(
@@ -463,6 +487,7 @@ internal class VolcengineTtsClient(
         const val TRIM_PADDING_MILLIS = 20
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
         const val DEBUG_WORDS_RADIUS = 5
+        const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
         const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
         const val MAX_CONCURRENT_TIMED_REQUESTS = 10
 

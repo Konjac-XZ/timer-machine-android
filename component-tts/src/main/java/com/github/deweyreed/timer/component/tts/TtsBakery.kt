@@ -323,12 +323,13 @@ object TtsBakery {
             Timber
                 .tag(TTS_LOG_TAG)
                 .i(
-                    "Cloud batch bake start: total=%d pending=%d cached=%d first=%s last=%s",
+                    "Cloud batch bake start: total=%d pending=%d cached=%d first=%s last=%s pendingTexts=%s",
                     texts.size,
                     pendingTexts.size,
                     successCount,
                     pendingTexts.firstOrNull(),
                     pendingTexts.lastOrNull(),
+                    pendingTexts.joinToString(separator = "|"),
                 )
             runCatching {
                 cloudTtsClient.synthesizeTimedSpeech(pendingTexts)
