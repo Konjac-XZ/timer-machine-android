@@ -16,9 +16,11 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
+import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
 import com.github.deweyreed.tools.arch.observeEvent
 import com.github.deweyreed.tools.arch.observeNonNull
@@ -26,6 +28,7 @@ import com.github.deweyreed.tools.helper.startDrawableAnimation
 import com.github.deweyreed.tools.helper.stopDrawableAnimation
 import com.github.deweyreed.tools.helper.toColorStateList
 import com.github.deweyreed.tools.utils.ThemeColorUtils
+import android.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
 import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
 import xyz.aprildown.timer.app.base.ui.BaseActivity
@@ -35,6 +38,7 @@ import xyz.aprildown.timer.app.base.utils.setTime
 import xyz.aprildown.timer.app.timer.run.MachineService
 import xyz.aprildown.timer.app.timer.run.databinding.ActivityScreenBinding
 import xyz.aprildown.timer.domain.entities.TimerEntity
+import xyz.aprildown.timer.domain.entities.StepType
 import xyz.aprildown.timer.domain.utils.Constants
 import xyz.aprildown.timer.presentation.screen.ScreenViewModel
 import xyz.aprildown.timer.presentation.stream.MachineContract
@@ -46,6 +50,32 @@ class ScreenActivity : BaseActivity() {
     private lateinit var binding: ActivityScreenBinding
 
     private val viewModel: ScreenViewModel by viewModels()
+    private lateinit var windowInsetsController: WindowInsetsControllerCompat
+    private var appliedLightStatusBars: Boolean? = null
+    private var appliedLightNavigationBars: Boolean? = null
+    
+    // Track current step info for gradient animation
+    private var currentStepType: StepType? = null
+    private var currentStepColor: Int = Color.TRANSPARENT
+    private var currentStepDuration: Long = 0L
+    private var currentStepColorIsLight: Boolean = false
+    
+    // For smooth animation updates
+    private var isAnimating = false
+    private val animationRunnable = object : Runnable {
+        override fun run() {
+            if (isAnimating) {
+                updateGradientProgress()
+                binding.root.postOnAnimation(this)
+            }
+        }
+    }
+
+    // Interpolation state between timer ticks
+    private var lastTickRemainingMs: Long = 0L
+    private var lastTickRealtimeMs: Long = 0L
+    private val windowLocation = IntArray(2)
+    private var lastGradientProgress: Float = 0f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +85,12 @@ class ScreenActivity : BaseActivity() {
 
         binding = ActivityScreenBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.clipToPadding = false
+        binding.root.clipChildren = false
+
+        windowInsetsController = WindowCompat.getInsetsController(window, binding.root)
+        appliedLightStatusBars = null
+        appliedLightNavigationBars = null
 
         init()
         setUpFullscreen()
@@ -107,6 +143,12 @@ class ScreenActivity : BaseActivity() {
                     }
                 }
             }
+            binding.gradientOverlay.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                topMargin = -targetInsets.top
+                bottomMargin = -targetInsets.bottom
+                marginStart = -targetInsets.left
+                marginEnd = -targetInsets.right
+            }
             insets
         }
 
@@ -137,20 +179,64 @@ class ScreenActivity : BaseActivity() {
 
     private fun setUpObservers() {
         viewModel.step.observeNonNull(this) { step ->
+            currentStepType = step.type
             val color = step.type.getTypeColor(this)
-            val isLightColor = ThemeColorUtils.isLightColor(color)
+            currentStepColor = color
+            currentStepColorIsLight = ThemeColorUtils.isLightColor(color)
+            val isLightColor = currentStepColorIsLight
             val onColor = AppThemeUtils.calculateOnColor(color)
 
-            WindowCompat.getInsetsController(window, binding.root).run {
-                isAppearanceLightStatusBars = isLightColor
-                isAppearanceLightNavigationBars = isLightColor
+            setSystemBarAppearance(isLightColor, isLightColor)
+
+            // Show ringing bell only for NOTIFIER steps
+            val showBell = step.type == StepType.NOTIFIER
+            binding.imageRingtone.isVisible = showBell
+        
+            // Enable gradient overlay for NORMAL steps only
+            val useGradient = step.type == StepType.NORMAL
+            if (!useGradient) {
+                lastGradientProgress = 0f
+            }
+            binding.gradientOverlay.isVisible = useGradient
+            
+            if (!useGradient) {
+                // Stop smooth animation for non-NORMAL steps
+                stopSmoothAnimation()
+                
+                // For non-NORMAL steps, use solid color background
+                binding.rootLayout.setBackgroundColor(color)
+                binding.textStepInfo.clearSplitColors()
+                binding.textTime.clearSplitColors()
+                binding.btnAddOneMinute.clearSplitColors()
+
+                val staticTextColor = if (step.type == StepType.NOTIFIER) {
+                    Color.WHITE
+                } else {
+                    onColor
+                }
+
+                binding.textStepInfo.setTextColor(staticTextColor)
+                binding.textTime.setTextColor(staticTextColor)
+                ImageViewCompat.setImageTintList(binding.imageRingtone, onColor.toColorStateList())
+                // textTime uses SplitColorTextView for partial inversion; do not force a single color here
+                binding.btnAddOneMinute.setTextColor(staticTextColor)
+            } else {
+                // For NORMAL steps, background will be handled by gradient overlay
+                binding.rootLayout.setBackgroundColor(color)
+                binding.textTime.setTextColor(Color.WHITE)
+                binding.textStepInfo.setTextColor(Color.WHITE)
+                binding.btnAddOneMinute.setTextColor(Color.WHITE)
+                lastGradientProgress = 0f
+                updateSystemBarsForProgress(lastGradientProgress)
+                // Start smooth animation
+                startSmoothAnimation()
             }
 
-            binding.root.setBackgroundColor(color)
-            binding.textStepInfo.setTextColor(onColor)
-            ImageViewCompat.setImageTintList(binding.imageRingtone, onColor.toColorStateList())
-            binding.textTime.setTextColor(onColor)
-            binding.btnAddOneMinute.setTextColor(onColor)
+            if (showBell) {
+                binding.imageRingtone.startDrawableAnimation()
+            } else {
+                binding.imageRingtone.stopDrawableAnimation()
+            }
 
             if (ColorUtils.calculateContrast(newDynamicTheme.colorSecondary, color) <=
                 3.0 // Min contrast
@@ -162,11 +248,22 @@ class ScreenActivity : BaseActivity() {
                 ImageViewCompat.setImageTintList(binding.btnStop, color.toColorStateList())
             }
         }
+        
+        viewModel.stepDuration.observe(this) { duration ->
+            currentStepDuration = duration
+            updateGradientProgress()
+        }
+        
         viewModel.timerStepInfo.observe(this) {
             binding.textStepInfo.text = it
         }
-        viewModel.timerCurrentTime.observe(this) {
-            binding.textTime.setTime(it ?: 0)
+        viewModel.timerCurrentTime.observe(this) { time ->
+            val remaining = time ?: 0L
+            binding.textTime.setTime(remaining)
+            // Capture tick baseline for per-frame interpolation
+            lastTickRemainingMs = remaining
+            lastTickRealtimeMs = android.os.SystemClock.elapsedRealtime()
+            // Don't call updateGradientProgress here - it's handled by smooth animation
         }
         binding.btnAddOneMinute.setOnClickListener {
             viewModel.onAddOneMinute()
@@ -183,19 +280,141 @@ class ScreenActivity : BaseActivity() {
         }
     }
 
+    private fun startSmoothAnimation() {
+        if (!isAnimating) {
+            isAnimating = true
+            binding.root.postOnAnimation(animationRunnable)
+        }
+    }
+    
+    private fun stopSmoothAnimation() {
+        isAnimating = false
+        binding.root.removeCallbacks(animationRunnable)
+    }
+
+    private fun setSystemBarAppearance(lightStatus: Boolean, lightNav: Boolean) {
+        if (!::windowInsetsController.isInitialized) {
+            return
+        }
+        if (appliedLightStatusBars != lightStatus) {
+            windowInsetsController.isAppearanceLightStatusBars = lightStatus
+            appliedLightStatusBars = lightStatus
+        }
+        if (appliedLightNavigationBars != lightNav) {
+            windowInsetsController.isAppearanceLightNavigationBars = lightNav
+            appliedLightNavigationBars = lightNav
+        }
+    }
+
+    private fun updateSystemBarsForProgress(progress: Float) {
+        if (currentStepType != StepType.NORMAL) {
+            return
+        }
+        val lightStatus = if (progress > 0f) {
+            true
+        } else {
+            currentStepColorIsLight
+        }
+        val lightNav = if (progress >= 1f) {
+            true
+        } else {
+            currentStepColorIsLight
+        }
+        setSystemBarAppearance(lightStatus, lightNav)
+    }
+
+    /**
+     * Update progress overlay and text colors for NORMAL steps.
+     * As time progresses, the screen turns white from top to bottom (sharp transition),
+     * and text colors invert from white to step color accordingly.
+     * This is called every frame for smooth animation.
+     */
+    private fun updateGradientProgress() {
+        if (currentStepType != StepType.NORMAL || !binding.gradientOverlay.isVisible) {
+            return
+        }
+        
+        // Interpolate remaining time smoothly using monotonic clock
+        val nowRealtime = android.os.SystemClock.elapsedRealtime()
+        val dt = (nowRealtime - lastTickRealtimeMs).coerceAtLeast(0L)
+        // Remaining time decreases as time passes
+        val interpolatedRemaining = (lastTickRemainingMs - dt).coerceAtLeast(0L)
+        val currentTime = interpolatedRemaining
+        val duration = currentStepDuration
+        
+        if (duration <= 0) {
+            return
+        }
+        
+        // Calculate elapsed time (duration - remaining time)
+        // currentTime is the REMAINING time (counts down from duration to 0)
+        val elapsed = duration - currentTime
+        val progress = if (duration > 0) {
+            (elapsed.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        
+        // Update overlay with sharp color transition
+        binding.gradientOverlay.setColorAndProgress(currentStepColor, progress)
+        
+        // Calculate text colors based on position
+        val gradientView = binding.gradientOverlay
+        val gradientHeight = gradientView.height
+        if (gradientHeight == 0) {
+            // Layout not ready yet, will update on next call
+            return
+        }
+
+        val gradientHeightFloat = gradientHeight.toFloat()
+        gradientView.getLocationInWindow(windowLocation)
+        val transitionYGlobal =
+            windowLocation[1].toFloat() + gradientHeightFloat * progress
+        
+        // Update timer text with split colors (convert global Y inside the view)
+        val topColor = currentStepColor // text on white area
+        val bottomColor = Color.WHITE // text on colored area
+        binding.textTime.setSplitGlobal(
+            globalSplitY = transitionYGlobal,
+            topColor = topColor,
+            bottomColor = bottomColor
+        )
+        binding.textStepInfo.setSplitGlobal(
+            globalSplitY = transitionYGlobal,
+            topColor = topColor,
+            bottomColor = bottomColor
+        )
+        binding.btnAddOneMinute.setSplitGlobal(
+            globalSplitY = transitionYGlobal,
+            topColor = topColor,
+            bottomColor = bottomColor
+        )
+
+        lastGradientProgress = progress
+        updateSystemBarsForProgress(progress)
+    }
+
     override fun onResume() {
         super.onResume()
         binding.imageRingtone.post {
-            binding.imageRingtone.startDrawableAnimation()
+            if (binding.imageRingtone.isVisible) {
+                binding.imageRingtone.startDrawableAnimation()
+            }
+        }
+        // Resume smooth animation if it's a NORMAL step
+        if (currentStepType == StepType.NORMAL && binding.gradientOverlay.isVisible) {
+            startSmoothAnimation()
         }
     }
 
     override fun onPause() {
         binding.imageRingtone.stopDrawableAnimation()
+        stopSmoothAnimation()
         super.onPause()
     }
 
     override fun onDestroy() {
+        stopSmoothAnimation()
         unbindService(mConnection)
         viewModel.dropPresenter()
         screen = null

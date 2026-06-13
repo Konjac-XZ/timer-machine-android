@@ -28,6 +28,10 @@ class ScreenViewModel @Inject constructor(
 
     private val _step: MutableLiveData<StepEntity.Step?> = MutableLiveData()
     val step: LiveData<StepEntity.Step?> = _step.distinctUntilChanged()
+    
+    // Store the step's total duration for progress calculation
+    private val _stepDuration = MutableLiveData<Long>().apply { value = 0L }
+    val stepDuration: LiveData<Long> = _stepDuration
 
     private val _stopEvent = MutableLiveData<Event<Unit>>()
     val stopEvent: LiveData<Event<Unit>> = _stopEvent
@@ -54,6 +58,7 @@ class ScreenViewModel @Inject constructor(
                 timerCurrentTime.value = time
                 val currentStep = timerEntity.getStep(index)
                 _step.value = currentStep
+                _stepDuration.value = currentStep?.length ?: 0L
                 timerStepInfo.value = if (index !is TimerIndex.Group) {
                     formatStepInfo(
                         timerName = timerEntity.name,

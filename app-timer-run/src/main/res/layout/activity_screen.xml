@@ -2,12 +2,24 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:background="?colorPrimarySurface"
     tools:ignore="Overdraw">
 
-    <TextView
+    <xyz.aprildown.timer.app.timer.run.screen.TimeProgressGradientView
+        android:id="@+id/gradientOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="UnknownId" />
+
+    <xyz.aprildown.timer.app.timer.run.screen.SplitColorTextView
         android:id="@+id/textStepInfo"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -38,7 +50,7 @@
         app:srcCompat="@drawable/ic_anim_ringing"
         tools:tint="?colorOnPrimarySurface" />
 
-    <TextView
+    <xyz.aprildown.timer.app.timer.run.screen.SplitColorTextView
         android:id="@+id/textTime"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -58,7 +70,7 @@
         tools:text="12:34"
         tools:textColor="?colorOnPrimarySurface" />
 
-    <Button
+    <xyz.aprildown.timer.app.timer.run.screen.SplitColorMaterialButton
         android:id="@+id/btnAddOneMinute"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="wrap_content"
