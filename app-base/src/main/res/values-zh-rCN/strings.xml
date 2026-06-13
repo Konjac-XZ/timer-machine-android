@@ -520,8 +520,13 @@
     <string name="pref_tts_clear_cache_summary">删除已生成的语音文件，需要时重新生成</string>
     <string name="pref_tts_clear_cache_confirmation">删除所有已生成的文字转语音音频文件？</string>
     <string name="pref_tts_clear_cache_done">文字转语音缓存已清空</string>
+    <string name="pref_cloud_tts_settings">火山引擎语音合成</string>
+    <string name="pref_cloud_tts_settings_summary">配置用于倒数预生成的云端语音合成</string>
+    <string name="pref_cloud_tts_enabled">使用火山引擎语音合成</string>
+    <string name="pref_cloud_tts_enabled_on">倒数预生成会在配置完整时使用火山引擎</string>
+    <string name="pref_cloud_tts_enabled_off">倒数预生成使用设备本地文字转语音</string>
     <string name="pref_cloud_tts_api_key">火山引擎 API Key</string>
-    <string name="pref_cloud_tts_api_key_summary">仅用于预生成倒数语音。留空时使用设备本地文字转语音。</string>
+    <string name="pref_cloud_tts_api_key_summary">启用火山引擎语音合成时必填</string>
     <string name="pref_cloud_tts_api_key_configured">已配置</string>
     <string name="pref_cloud_tts_resource_id">火山引擎资源 ID</string>
     <string name="pref_cloud_tts_speaker">火山引擎音色</string>

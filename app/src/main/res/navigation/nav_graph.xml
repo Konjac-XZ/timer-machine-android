@@ -45,6 +45,11 @@
         tools:layout="@layout/fragment_floating_window_pip" />
 
     <fragment
+        android:id="@id/dest_cloud_tts_settings"
+        android:name="xyz.aprildown.timer.app.settings.CloudTtsSettingsFragment"
+        android:label="@string/pref_cloud_tts_settings" />
+
+    <fragment
         android:id="@id/dest_whitelist"
         android:name="xyz.aprildown.timer.workshop.WhitelistFragment"
         android:label="@string/help_whitelist" />

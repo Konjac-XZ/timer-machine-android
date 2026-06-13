@@ -180,6 +180,7 @@ class MainActivity :
 
             RBase.id.dest_settings,
             RBase.id.dest_settings_floating_window_pip,
+            RBase.id.dest_cloud_tts_settings,
             RBase.id.dest_theme,
             RBase.id.dest_one_layout,
             RBase.id.dest_about -> refreshMainUi(DRAWER_ID_SETTINGS)

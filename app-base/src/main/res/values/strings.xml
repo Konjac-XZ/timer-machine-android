@@ -707,8 +707,13 @@
     <string name="pref_tts_clear_cache_summary">Delete generated speech files and rebuild them when needed</string>
     <string name="pref_tts_clear_cache_confirmation">Delete all generated text-to-speech audio files?</string>
     <string name="pref_tts_clear_cache_done">Text-to-speech cache cleared</string>
+    <string name="pref_cloud_tts_settings">Volcengine TTS</string>
+    <string name="pref_cloud_tts_settings_summary">Configure cloud TTS for countdown pre-rendering</string>
+    <string name="pref_cloud_tts_enabled">Use Volcengine TTS</string>
+    <string name="pref_cloud_tts_enabled_on">Countdown pre-rendering uses Volcengine when the settings are complete</string>
+    <string name="pref_cloud_tts_enabled_off">Countdown pre-rendering uses the device TTS engine</string>
     <string name="pref_cloud_tts_api_key">Volcengine API Key</string>
-    <string name="pref_cloud_tts_api_key_summary">Used only for countdown pre-rendering. Leave empty to use the device TTS engine.</string>
+    <string name="pref_cloud_tts_api_key_summary">Required when Volcengine TTS is enabled</string>
     <string name="pref_cloud_tts_api_key_configured">Configured</string>
     <string name="pref_cloud_tts_resource_id">Volcengine resource ID</string>
     <string name="pref_cloud_tts_speaker">Volcengine speaker</string>

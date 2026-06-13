@@ -14,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
-import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
 import com.github.deweyreed.timer.component.tts.TtsBakery
@@ -109,16 +108,6 @@ class SettingsFragment :
                     }
                 }
             }
-            KEY_CLOUD_TTS_SPEECH_RATE -> {
-                val value = newValue?.toString()?.toIntOrNull()
-                if (value == null || value !in -50..100) return false
-                clearTtsCache()
-            }
-            KEY_CLOUD_TTS_API_KEY,
-            KEY_CLOUD_TTS_RESOURCE_ID,
-            KEY_CLOUD_TTS_SPEAKER -> {
-                clearTtsCache()
-            }
         }
         return true
     }
@@ -159,6 +148,10 @@ class SettingsFragment :
             }
             KEY_TTS_CLEAR_CACHE -> {
                 showTtsClearCacheDialog()
+            }
+            KEY_CLOUD_TTS_SETTINGS -> {
+                NavHostFragment.findNavController(this)
+                    .subLevelNavigate(RBase.id.dest_cloud_tts_settings)
             }
             KEY_NOTIF_SETTING -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -231,30 +224,7 @@ class SettingsFragment :
         findPreference<Preference>(KEY_TTS_BAKERY)?.onPreferenceChangeListener = this
         findPreference<Preference>(KEY_TTS_PRERENDER)?.onPreferenceClickListener = this
         findPreference<Preference>(KEY_TTS_CLEAR_CACHE)?.onPreferenceClickListener = this
-        findPreference<EditTextPreference>(KEY_CLOUD_TTS_API_KEY)?.run {
-            setOnBindEditTextListener {
-                it.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
-            }
-            summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
-                if (preference.text.isNullOrBlank()) {
-                    getString(RBase.string.pref_cloud_tts_api_key_summary)
-                } else {
-                    getString(RBase.string.pref_cloud_tts_api_key_configured)
-                }
-            }
-        }
-        findPreference<EditTextPreference>(KEY_CLOUD_TTS_RESOURCE_ID)?.setOnBindEditTextListener {
-            it.inputType = InputType.TYPE_CLASS_TEXT
-        }
-        findPreference<EditTextPreference>(KEY_CLOUD_TTS_SPEAKER)?.setOnBindEditTextListener {
-            it.inputType = InputType.TYPE_CLASS_TEXT
-        }
-        findPreference<EditTextPreference>(KEY_CLOUD_TTS_SPEECH_RATE)?.run {
-            setOnBindEditTextListener {
-                it.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
-            }
-            onPreferenceChangeListener = this@SettingsFragment
-        }
+        findPreference<Preference>(KEY_CLOUD_TTS_SETTINGS)?.onPreferenceClickListener = this
         findPreference<ListPreference>(KEY_WEEK_START)?.run {
             val weekdays = listOf(
                 Calendar.MONDAY,
@@ -512,10 +482,7 @@ private const val KEY_BAKED_COUNT = PreferenceData.PREF_BAKED_COUNT
 private const val KEY_TTS_BAKERY = PreferenceData.PREF_IS_TTS_BAKERY_OPEN
 private const val KEY_TTS_PRERENDER = "key_tts_prerender"
 private const val KEY_TTS_CLEAR_CACHE = "key_tts_clear_cache"
-private const val KEY_CLOUD_TTS_API_KEY = PreferenceData.PREF_CLOUD_TTS_API_KEY
-private const val KEY_CLOUD_TTS_RESOURCE_ID = PreferenceData.PREF_CLOUD_TTS_RESOURCE_ID
-private const val KEY_CLOUD_TTS_SPEAKER = PreferenceData.PREF_CLOUD_TTS_SPEAKER
-private const val KEY_CLOUD_TTS_SPEECH_RATE = PreferenceData.PREF_CLOUD_TTS_SPEECH_RATE
+private const val KEY_CLOUD_TTS_SETTINGS = "key_cloud_tts_settings"
 private const val DEFAULT_TTS_PRERENDER_COUNT = 300
 private const val MAX_TTS_PRERENDER_COUNT = 300
 
