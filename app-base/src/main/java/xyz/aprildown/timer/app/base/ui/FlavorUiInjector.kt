@@ -24,7 +24,7 @@ annotation class FlavorUiInjectorQualifier
 
 @Module
 @InstallIn(SingletonComponent::class)
-internal abstract class FlavorUiInjectorModule {
+abstract class FlavorUiInjectorModule {
     @BindsOptionalOf
     @FlavorUiInjectorQualifier
     abstract fun bindOptionalFlavorUiInjector(): FlavorUiInjector
