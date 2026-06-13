@@ -156,6 +156,7 @@ internal class VolcengineTtsClient(
                         "sample_rate" to 24000,
                         "bit_rate" to 64000,
                         "speech_rate" to settings.speechRate.coerceIn(-50, 100),
+                        "emotion_scale" to settings.emotionScale.coerceIn(1, 5),
                     ),
                 ),
             )

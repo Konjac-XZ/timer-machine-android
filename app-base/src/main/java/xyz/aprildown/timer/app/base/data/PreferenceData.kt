@@ -461,6 +461,7 @@ object PreferenceData {
     const val PREF_CLOUD_TTS_RESOURCE_ID = "pref_cloud_tts_resource_id"
     const val PREF_CLOUD_TTS_SPEAKER = "pref_cloud_tts_speaker"
     const val PREF_CLOUD_TTS_SPEECH_RATE = "pref_cloud_tts_speech_rate"
+    const val PREF_CLOUD_TTS_EMOTION_SCALE = "pref_cloud_tts_emotion_scale"
     const val PREF_CLOUD_TTS_ENABLED = "pref_cloud_tts_enabled"
 
     data class CloudTtsSettings(
@@ -469,6 +470,7 @@ object PreferenceData {
         val resourceId: String,
         val speaker: String,
         val speechRate: Int,
+        val emotionScale: Int,
     ) {
         val isConfigured: Boolean
             get() = enabled && apiKey.isNotBlank() && resourceId.isNotBlank() && speaker.isNotBlank()
@@ -481,5 +483,6 @@ object PreferenceData {
             resourceId = getNonNullString(PREF_CLOUD_TTS_RESOURCE_ID, "seed-tts-2.0"),
             speaker = getNonNullString(PREF_CLOUD_TTS_SPEAKER, "zh_female_cancan_mars_bigtts"),
             speechRate = getNonNullString(PREF_CLOUD_TTS_SPEECH_RATE, "0").toIntOrNull() ?: 0,
+            emotionScale = getNonNullString(PREF_CLOUD_TTS_EMOTION_SCALE, "1").toIntOrNull() ?: 1,
         )
 }

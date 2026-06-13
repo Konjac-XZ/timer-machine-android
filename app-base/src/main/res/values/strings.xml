@@ -719,6 +719,8 @@
     <string name="pref_cloud_tts_speaker">Volcengine speaker</string>
     <string name="pref_cloud_tts_speech_rate">Volcengine speech rate</string>
     <string name="pref_cloud_tts_speech_rate_summary">Range: -50 to 100. 100 is 2x speed; -50 is 0.5x speed.</string>
+    <string name="pref_cloud_tts_emotion_scale">Volcengine emotion scale</string>
+    <string name="pref_cloud_tts_emotion_scale_summary">Range: 1 to 5. Default: 1.</string>
 
     <string name="pref_media_style_notification">Media Style Notification</string>
 

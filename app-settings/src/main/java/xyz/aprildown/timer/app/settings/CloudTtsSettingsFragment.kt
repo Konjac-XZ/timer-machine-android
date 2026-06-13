@@ -32,6 +32,11 @@ class CloudTtsSettingsFragment :
                 if (value == null || value !in -50..100) return false
                 clearTtsCache()
             }
+            KEY_CLOUD_TTS_EMOTION_SCALE -> {
+                val value = newValue?.toString()?.toIntOrNull()
+                if (value == null || value !in 1..5) return false
+                clearTtsCache()
+            }
             KEY_CLOUD_TTS_ENABLED,
             KEY_CLOUD_TTS_API_KEY,
             KEY_CLOUD_TTS_RESOURCE_ID,
@@ -75,6 +80,12 @@ class CloudTtsSettingsFragment :
             }
             onPreferenceChangeListener = this@CloudTtsSettingsFragment
         }
+        findPreference<EditTextPreference>(KEY_CLOUD_TTS_EMOTION_SCALE)?.run {
+            setOnBindEditTextListener {
+                it.inputType = InputType.TYPE_CLASS_NUMBER
+            }
+            onPreferenceChangeListener = this@CloudTtsSettingsFragment
+        }
     }
 
     private fun clearTtsCache() {
@@ -90,3 +101,4 @@ private const val KEY_CLOUD_TTS_API_KEY = PreferenceData.PREF_CLOUD_TTS_API_KEY
 private const val KEY_CLOUD_TTS_RESOURCE_ID = PreferenceData.PREF_CLOUD_TTS_RESOURCE_ID
 private const val KEY_CLOUD_TTS_SPEAKER = PreferenceData.PREF_CLOUD_TTS_SPEAKER
 private const val KEY_CLOUD_TTS_SPEECH_RATE = PreferenceData.PREF_CLOUD_TTS_SPEECH_RATE
+private const val KEY_CLOUD_TTS_EMOTION_SCALE = PreferenceData.PREF_CLOUD_TTS_EMOTION_SCALE

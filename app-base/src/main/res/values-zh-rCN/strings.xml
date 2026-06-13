@@ -532,6 +532,8 @@
     <string name="pref_cloud_tts_speaker">火山引擎音色</string>
     <string name="pref_cloud_tts_speech_rate">火山引擎语速</string>
     <string name="pref_cloud_tts_speech_rate_summary">范围：-50 到 100。100 表示 2 倍速，-50 表示 0.5 倍速。</string>
+    <string name="pref_cloud_tts_emotion_scale">火山引擎情感强度</string>
+    <string name="pref_cloud_tts_emotion_scale_summary">范围：1 到 5。默认：1。</string>
     <string name="pref_media_style_notification">媒体样式通知</string>
     <!--Reminder preferences-->
     <string name="pref_reminder">提醒方式</string>

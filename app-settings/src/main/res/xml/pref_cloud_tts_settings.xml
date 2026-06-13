@@ -45,4 +45,13 @@
         app:summary="@string/pref_cloud_tts_speech_rate_summary"
         app:title="@string/pref_cloud_tts_speech_rate" />
 
+    <EditTextPreference
+        app:dependency="pref_cloud_tts_enabled"
+        app:defaultValue="1"
+        app:icon="@drawable/settings_tweak_time"
+        app:key="pref_cloud_tts_emotion_scale"
+        app:singleLineTitle="false"
+        app:summary="@string/pref_cloud_tts_emotion_scale_summary"
+        app:title="@string/pref_cloud_tts_emotion_scale" />
+
 </PreferenceScreen>
