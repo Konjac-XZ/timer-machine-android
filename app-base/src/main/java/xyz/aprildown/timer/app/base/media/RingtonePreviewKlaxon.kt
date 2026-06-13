@@ -19,6 +19,7 @@ package xyz.aprildown.timer.app.base.media
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 
 object RingtonePreviewKlaxon {
 
@@ -26,6 +27,7 @@ object RingtonePreviewKlaxon {
     private lateinit var sAsyncRingtonePlayer: AsyncRingtonePlayer
 
     fun stop(context: Context) {
+        Log.i(COUNTDOWN_TTS_LOG_TAG, "RingtonePreviewKlaxon.stop")
         getAsyncRingtonePlayer(context).stop()
     }
 
@@ -36,6 +38,10 @@ object RingtonePreviewKlaxon {
         audioFocusType: Int,
         streamType: Int,
     ) {
+        Log.i(
+            COUNTDOWN_TTS_LOG_TAG,
+            "RingtonePreviewKlaxon.start uri=$uri loop=$loop focus=$audioFocusType stream=$streamType"
+        )
         stop(context)
         getAsyncRingtonePlayer(context).play(
             ringtoneUri = uri,
@@ -54,3 +60,5 @@ object RingtonePreviewKlaxon {
         return sAsyncRingtonePlayer
     }
 }
+
+private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"

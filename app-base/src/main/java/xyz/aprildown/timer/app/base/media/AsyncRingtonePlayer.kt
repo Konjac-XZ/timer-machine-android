@@ -27,6 +27,7 @@ import android.os.HandlerThread
 import android.os.Looper
 import android.os.Message
 import android.telecom.TelecomManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.os.BundleCompat
@@ -47,6 +48,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
     private val mHandler: Handler by lazy { getNewHandler() }
 
     private val mPlaybackDelegate = ExoPlayerPlaybackDelegate()
+    private var mNextPlaybackId = NO_PLAYBACK_ID
 
     fun play(
         ringtoneUri: Uri,
@@ -54,8 +56,18 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
         audioFocusType: Int,
         streamType: Int
     ) {
+        val playbackId = synchronized(this) {
+            mNextPlaybackId += 1
+            mNextPlaybackId
+        }
+        Log.i(
+            COUNTDOWN_TTS_LOG_TAG,
+            "AsyncRingtonePlayer.queue PLAY id=$playbackId uri=$ringtoneUri loop=$loop " +
+                "focus=$audioFocusType stream=$streamType"
+        )
         postMessage(
             messageCode = EVENT_PLAY,
+            playbackId = playbackId,
             ringtoneUri = ringtoneUri,
             loop = loop,
             audioFocusType = audioFocusType,
@@ -64,7 +76,13 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
     }
 
     fun stop() {
-        postMessage(EVENT_STOP, null, false, 0, 0)
+        Log.i(COUNTDOWN_TTS_LOG_TAG, "AsyncRingtonePlayer.queue STOP id=ANY")
+        postMessage(EVENT_STOP, ANY_PLAYBACK_ID, null, false, 0, 0)
+    }
+
+    private fun stop(playbackId: Long) {
+        Log.i(COUNTDOWN_TTS_LOG_TAG, "AsyncRingtonePlayer.queue STOP id=$playbackId")
+        postMessage(EVENT_STOP, playbackId, null, false, 0, 0)
     }
 
     /**
@@ -75,6 +93,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
      */
     private fun postMessage(
         messageCode: Int,
+        playbackId: Long,
         ringtoneUri: Uri?,
         loop: Boolean,
         audioFocusType: Int,
@@ -82,13 +101,16 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
     ) {
         synchronized(this) {
             val message = mHandler.obtainMessage(messageCode)
-            if (ringtoneUri != null) {
-                message.data = bundleOf(
+            message.data = if (ringtoneUri != null) {
+                bundleOf(
+                    PLAYBACK_ID to playbackId,
                     RINGTONE_URI_KEY to ringtoneUri,
                     LOOP to loop,
                     AUDIO_FOCUS_TYPE to audioFocusType,
                     STREAM_TYPE to streamType
                 )
+            } else {
+                bundleOf(PLAYBACK_ID to playbackId)
             }
 
             mHandler.sendMessage(message)
@@ -108,6 +130,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
          * [android.media.MediaPlayer] doesn't handle internally looping media properly.
          */
         private var mExoPlayer: ExoPlayer? = null
+        private var mPlaybackId: Long = NO_PLAYBACK_ID
 
         private var mLoop: Boolean = false
 
@@ -124,9 +147,17 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
             ringtoneUri: Uri?,
             loop: Boolean,
             audioFocusType: Int,
-            streamType: Int
+            streamType: Int,
+            playbackId: Long,
         ) {
             checkAsyncRingtonePlayerThread()
+            stop(ANY_PLAYBACK_ID)
+            mPlaybackId = playbackId
+            Log.i(
+                COUNTDOWN_TTS_LOG_TAG,
+                "AsyncRingtonePlayer.delegate PLAY id=$playbackId uri=$ringtoneUri " +
+                    "loop=$loop focus=$audioFocusType stream=$streamType"
+            )
             mLoop = loop
             mAudioFocusType = audioFocusType
             mStreamType = streamType
@@ -147,7 +178,13 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                 object : RingtonePlayerListener() {
                     override fun onPlayerError(error: PlaybackException) {
                         super.onPlayerError(error)
-                        this@AsyncRingtonePlayer.stop()
+                        Log.e(
+                            COUNTDOWN_TTS_LOG_TAG,
+                            "AsyncRingtonePlayer.player ERROR id=$playbackId code=${error.errorCode} " +
+                                "message=${error.message}",
+                            error,
+                        )
+                        this@AsyncRingtonePlayer.stop(playbackId)
                     }
                 }
             )
@@ -158,16 +195,26 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                 // installation time. M+, this permission can be revoked by the user any time.
                 mExoPlayer?.setMediaItem(MediaItem.fromUri(alarmNoise))
 
-                startPlayback(inTelephoneCall)
-            } catch (_: Throwable) {
+                startPlayback(inTelephoneCall, playbackId)
+            } catch (error: Throwable) {
+                Log.e(
+                    COUNTDOWN_TTS_LOG_TAG,
+                    "AsyncRingtonePlayer.player primary start failed id=$playbackId uri=$alarmNoise",
+                    error,
+                )
                 // The alarmNoise may be on the sd card which could be busy right now.
                 // Use the fallback ringtone.
                 try {
                     // Must reset the media player to clear the error state.
                     mExoPlayer?.stop()
                     mExoPlayer?.setMediaItem(MediaItem.fromUri(getFallbackRingtoneUri(context)))
-                    startPlayback(inTelephoneCall)
-                } catch (_: Throwable) {
+                    startPlayback(inTelephoneCall, playbackId)
+                } catch (fallbackError: Throwable) {
+                    Log.e(
+                        COUNTDOWN_TTS_LOG_TAG,
+                        "AsyncRingtonePlayer.player fallback start failed id=$playbackId",
+                        fallbackError,
+                    )
                     // At this point we just don't play anything.
                 }
             }
@@ -182,7 +229,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
          * required to advance the crescendo effect
          */
         @Throws(IOException::class)
-        private fun startPlayback(inTelephoneCall: Boolean) {
+        private fun startPlayback(inTelephoneCall: Boolean, playbackId: Long) {
             // Indicate the ringtone should be played via the alarm stream.
             var contentType = C.AUDIO_CONTENT_TYPE_UNKNOWN
             var usage = C.USAGE_MEDIA
@@ -217,14 +264,20 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                     addListener(
                         object : RingtonePlayerListener() {
                             override fun onPlaybackStateChanged(playbackState: Int) {
+                                Log.i(
+                                    COUNTDOWN_TTS_LOG_TAG,
+                                    "AsyncRingtonePlayer.player STATE id=$playbackId " +
+                                        "state=${playbackState.toPlaybackStateName()}"
+                                )
                                 if (playbackState == Player.STATE_ENDED) {
-                                    this@AsyncRingtonePlayer.stop()
+                                    this@AsyncRingtonePlayer.stop(playbackId)
                                 }
                             }
                         }
                     )
                 }
                 playWhenReady = true
+                Log.i(COUNTDOWN_TTS_LOG_TAG, "AsyncRingtonePlayer.player PREPARE id=$playbackId")
                 prepare()
 
                 mAudioManager?.let {
@@ -247,9 +300,14 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
         }
 
         override fun onAudioFocusChange(focusChange: Int) {
+            Log.i(
+                COUNTDOWN_TTS_LOG_TAG,
+                "AsyncRingtonePlayer.focus id=$mPlaybackId focusChange=$focusChange " +
+                    "isPlaying=${mExoPlayer?.isPlaying}"
+            )
             when (focusChange) {
                 AudioManager.AUDIOFOCUS_LOSS -> {
-                    this@AsyncRingtonePlayer.stop()
+                    this@AsyncRingtonePlayer.stop(mPlaybackId)
                 }
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
@@ -274,8 +332,20 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
         /**
          * Stops the playback of the ringtone. Executes on the ringtone-thread.
          */
-        fun stop() {
+        fun stop(playbackId: Long) {
             checkAsyncRingtonePlayerThread()
+            if (playbackId != ANY_PLAYBACK_ID && playbackId != mPlaybackId) {
+                Log.i(
+                    COUNTDOWN_TTS_LOG_TAG,
+                    "AsyncRingtonePlayer.delegate STOP ignored id=$playbackId current=$mPlaybackId"
+                )
+                return
+            }
+            Log.i(
+                COUNTDOWN_TTS_LOG_TAG,
+                "AsyncRingtonePlayer.delegate STOP execute id=$playbackId current=$mPlaybackId " +
+                    "hasPlayer=${mExoPlayer != null}"
+            )
 
             // Stop audio playing
             if (mExoPlayer != null) {
@@ -283,6 +353,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                 mExoPlayer?.release()
                 mExoPlayer = null
             }
+            mPlaybackId = NO_PLAYBACK_ID
 
             mAudioManager?.let {
                 AudioFocusManager.abandonAudioFocus(it, this@ExoPlayerPlaybackDelegate)
@@ -296,7 +367,8 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
         private inner class BecomeNoisyReceiver : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                    this@AsyncRingtonePlayer.stop()
+                    Log.i(COUNTDOWN_TTS_LOG_TAG, "AsyncRingtonePlayer.noisy id=$mPlaybackId")
+                    this@AsyncRingtonePlayer.stop(mPlaybackId)
                 }
             }
         }
@@ -310,6 +382,11 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                 when (msg.what) {
                     EVENT_PLAY -> {
                         val data = msg.data
+                        Log.i(
+                            COUNTDOWN_TTS_LOG_TAG,
+                            "AsyncRingtonePlayer.handle PLAY id=${data.getLong(PLAYBACK_ID)} " +
+                                "uri=${BundleCompat.getParcelable(data, RINGTONE_URI_KEY, Uri::class.java)}"
+                        )
                         mPlaybackDelegate.play(
                             context = mContext,
                             ringtoneUri = BundleCompat.getParcelable(
@@ -319,11 +396,14 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                             ),
                             loop = data.getBoolean(LOOP),
                             audioFocusType = data.getInt(AUDIO_FOCUS_TYPE),
-                            streamType = data.getInt(STREAM_TYPE)
+                            streamType = data.getInt(STREAM_TYPE),
+                            playbackId = data.getLong(PLAYBACK_ID),
                         )
                     }
                     EVENT_STOP -> {
-                        mPlaybackDelegate.stop()
+                        val playbackId = msg.data.getLong(PLAYBACK_ID, ANY_PLAYBACK_ID)
+                        Log.i(COUNTDOWN_TTS_LOG_TAG, "AsyncRingtonePlayer.handle STOP id=$playbackId")
+                        mPlaybackDelegate.stop(playbackId)
                     }
                 }
             }
@@ -348,6 +428,18 @@ private const val RINGTONE_URI_KEY = "RINGTONE_URI_KEY"
 private const val LOOP = "LOOP"
 private const val AUDIO_FOCUS_TYPE = "AUDIO_FOCUS_TYPE"
 private const val STREAM_TYPE = "STREAM_TYPE"
+private const val PLAYBACK_ID = "PLAYBACK_ID"
+private const val ANY_PLAYBACK_ID = -1L
+private const val NO_PLAYBACK_ID = 0L
+private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
+
+private fun Int.toPlaybackStateName(): String = when (this) {
+    Player.STATE_IDLE -> "IDLE"
+    Player.STATE_BUFFERING -> "BUFFERING"
+    Player.STATE_READY -> "READY"
+    Player.STATE_ENDED -> "ENDED"
+    else -> "UNKNOWN($this)"
+}
 
 private open class RingtonePlayerListener : Player.Listener {
     override fun onEvents(player: Player, events: Player.Events) = Unit
