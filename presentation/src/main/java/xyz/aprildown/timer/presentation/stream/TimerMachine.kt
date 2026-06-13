@@ -1,5 +1,6 @@
 package xyz.aprildown.timer.presentation.stream
 
+import android.util.Log
 import xyz.aprildown.timer.domain.entities.BehaviourType
 import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.domain.entities.TimerEntity
@@ -221,11 +222,22 @@ internal class TimerMachine(
             val remainingSeconds = newTime / 1000
             if (!isWarmedUp && remainingSeconds <= warmUpTime) {
                 isWarmedUp = true
+                Log.i(
+                    COUNTDOWN_TTS_LOG_TAG,
+                    "TimerMachine.count warmUp newTimeMs=$newTime remainingSeconds=$remainingSeconds " +
+                        "timesLeft=$times warmUpTime=$warmUpTime"
+                )
                 count("")
             }
             if (remainingSeconds <= times && times > 0) {
+                val spokenText = remainingSeconds.toInt().toString()
+                Log.i(
+                    COUNTDOWN_TTS_LOG_TAG,
+                    "TimerMachine.count emit text=\"$spokenText\" newTimeMs=$newTime " +
+                        "remainingSeconds=$remainingSeconds timesBefore=$times"
+                )
                 times--
-                count(remainingSeconds.toInt().toString())
+                count(spokenText)
             }
         }
     }
@@ -244,3 +256,5 @@ internal class TimerMachine(
         }
     }
 }
+
+private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
