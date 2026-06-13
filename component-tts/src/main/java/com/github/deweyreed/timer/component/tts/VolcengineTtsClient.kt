@@ -488,7 +488,7 @@ internal class VolcengineTtsClient(
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
         const val DEBUG_WORDS_RADIUS = 5
         const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
-        const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
+        const val MAX_SENTENCES_PER_TIMED_REQUEST = 5
         const val MAX_CONCURRENT_TIMED_REQUESTS = 10
 
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
