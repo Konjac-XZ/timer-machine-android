@@ -1,12 +1,15 @@
 package io.github.deweyreed.timer
 
 import android.Manifest
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.hilt.work.HiltWorkerFactory
@@ -63,6 +66,7 @@ class App : Application(), WorkManagerConfiguration.Provider, SingletonImageLoad
 
         // Track app foreground/background state for runtime decisions.
         AppVisibilityTracker.init(this)
+        setUpKeepScreenOn()
 
         setUpAnalytics()
         setUpLogger()
@@ -79,6 +83,32 @@ class App : Application(), WorkManagerConfiguration.Provider, SingletonImageLoad
 
     private fun setUpAnalytics() {
         appTracker.init(this)
+    }
+
+    private fun setUpKeepScreenOn() {
+        registerActivityLifecycleCallbacks(
+            object : ActivityLifecycleCallbacks {
+                override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) =
+                    Unit
+
+                override fun onActivityStarted(activity: Activity) {
+                    activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+
+                override fun onActivityResumed(activity: Activity) = Unit
+
+                override fun onActivityPaused(activity: Activity) = Unit
+
+                override fun onActivityStopped(activity: Activity) {
+                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+
+                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) =
+                    Unit
+
+                override fun onActivityDestroyed(activity: Activity) = Unit
+            }
+        )
     }
 
     private fun setUpLogger() {
