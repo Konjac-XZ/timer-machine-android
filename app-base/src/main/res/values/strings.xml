@@ -702,6 +702,10 @@
     <string name="pref_tts_prerender_invalid_input">Please enter a number between 1 and 300</string>
     <string name="pref_tts_prerender_notification_title">Pre-rendering countdown audio</string>
     <string name="pref_tts_prerender_notification_progress">Rendering %1$d of %2$d</string>
+    <string name="pref_tts_clear_cache">Clear text-to-speech cache</string>
+    <string name="pref_tts_clear_cache_summary">Delete generated speech files and rebuild them when needed</string>
+    <string name="pref_tts_clear_cache_confirmation">Delete all generated text-to-speech audio files?</string>
+    <string name="pref_tts_clear_cache_done">Text-to-speech cache cleared</string>
 
     <string name="pref_media_style_notification">Media Style Notification</string>
 

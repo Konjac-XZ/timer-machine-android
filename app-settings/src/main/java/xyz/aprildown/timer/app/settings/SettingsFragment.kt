@@ -145,6 +145,9 @@ class SettingsFragment :
             KEY_TTS_PRERENDER -> {
                 showTtsPrerenderDialog()
             }
+            KEY_TTS_CLEAR_CACHE -> {
+                showTtsClearCacheDialog()
+            }
             KEY_NOTIF_SETTING -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     val settingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
@@ -215,6 +218,7 @@ class SettingsFragment :
         findPreference<Preference>(KEY_PHONE_CALL)?.onPreferenceChangeListener = this
         findPreference<Preference>(KEY_TTS_BAKERY)?.onPreferenceChangeListener = this
         findPreference<Preference>(KEY_TTS_PRERENDER)?.onPreferenceClickListener = this
+        findPreference<Preference>(KEY_TTS_CLEAR_CACHE)?.onPreferenceClickListener = this
         findPreference<ListPreference>(KEY_WEEK_START)?.run {
             val weekdays = listOf(
                 Calendar.MONDAY,
@@ -345,6 +349,21 @@ class SettingsFragment :
         }
     }
 
+    private fun showTtsClearCacheDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(RBase.string.pref_tts_clear_cache)
+            .setMessage(RBase.string.pref_tts_clear_cache_confirmation)
+            .setNegativeButton(RBase.string.cancel, null)
+            .setPositiveButton(RBase.string.ok) { _, _ ->
+                val context = requireContext().applicationContext
+                fireAndForget {
+                    TtsBakery.tearDown(context)
+                }
+                view?.longSnackbar(RBase.string.pref_tts_clear_cache_done)
+            }
+            .show()
+    }
+
     private fun showTtsPrerenderProgressDialog() {
         ttsPrerenderDialogJob?.cancel()
 
@@ -446,6 +465,7 @@ private const val KEY_FLOATING_WINDOW_PIP = "key_floating_window_pip"
 private const val KEY_BAKED_COUNT = PreferenceData.PREF_BAKED_COUNT
 private const val KEY_TTS_BAKERY = PreferenceData.PREF_IS_TTS_BAKERY_OPEN
 private const val KEY_TTS_PRERENDER = "key_tts_prerender"
+private const val KEY_TTS_CLEAR_CACHE = "key_tts_clear_cache"
 private const val DEFAULT_TTS_PRERENDER_COUNT = 300
 private const val MAX_TTS_PRERENDER_COUNT = 300
 
