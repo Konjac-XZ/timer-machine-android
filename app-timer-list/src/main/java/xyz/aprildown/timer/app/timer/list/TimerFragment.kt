@@ -110,6 +110,8 @@ class TimerFragment :
         menuInflater.inflate(R.menu.timer, menu)
     }
 
+    override fun onPrepareMenu(menu: Menu) = Unit
+
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
         return when (menuItem.itemId) {
             R.id.action_record -> {

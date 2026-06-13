@@ -690,6 +690,48 @@
     <string name="pref_tts_bakery_off">Generate the audio file of every Text-to-speech content for a quick speech afterward</string>
     <string name="pref_tts_bakery_on">If Text-to-speech malfunctions, please turn off this option</string>
 
+    <string name="pref_tts_prerender_title">Pre-render countdown audio</string>
+    <string name="pref_tts_prerender_dialog_title">Pre-render Count</string>
+    <string name="pref_tts_prerender_dialog_message">Enter the maximum countdown number to pre-render.</string>
+    <string name="pref_tts_prerender_dialog_message_cloud">Enter the maximum countdown number to pre-render with cloud TTS.</string>
+    <string name="pref_tts_prerender_dialog_hint">Maximum count</string>
+    <string name="pref_tts_prerender_cloud_batching">Requesting cloud batch synthesis…</string>
+    <string name="pref_tts_prerender_progress">Rendering audio %1$d of %2$d…</string>
+    <string name="pref_tts_prerender_completed">Rendered %1$d of %2$d audio files</string>
+    <string name="pref_tts_prerender_completed_with_failures">Rendered %1$d of %2$d audio files; %3$d failed</string>
+    <string name="pref_tts_prerender_failed">Unable to start TTS rendering</string>
+    <string name="pref_tts_prerender_already_running">TTS rendering is already running</string>
+    <string name="pref_tts_prerender_invalid_input">Please enter a number between 1 and 300</string>
+    <string name="pref_tts_prerender_notification_title">Pre-rendering countdown audio</string>
+    <string name="pref_tts_prerender_notification_progress">Rendering %1$d of %2$d</string>
+    <string name="pref_tts_clear_cache">Clear text-to-speech cache</string>
+    <string name="pref_tts_clear_cache_summary">Delete generated speech files and rebuild them when needed</string>
+    <string name="pref_tts_clear_cache_confirmation">Delete all generated text-to-speech audio files?</string>
+    <string name="pref_tts_clear_cache_done">Text-to-speech cache cleared</string>
+    <string name="pref_cloud_tts_settings">Volcengine TTS</string>
+    <string name="pref_cloud_tts_settings_summary">Configure cloud TTS for countdown pre-rendering</string>
+    <string name="pref_cloud_tts_enabled">Use Volcengine TTS</string>
+    <string name="pref_cloud_tts_enabled_on">Countdown pre-rendering uses Volcengine when the settings are complete</string>
+    <string name="pref_cloud_tts_enabled_off">Countdown pre-rendering uses the device TTS engine</string>
+    <string name="pref_cloud_tts_category_access">Access and voice</string>
+    <string name="pref_cloud_tts_category_voice">Voice behavior</string>
+    <string name="pref_cloud_tts_category_batching">Countdown batching</string>
+    <string name="pref_cloud_tts_api_key">Volcengine API Key</string>
+    <string name="pref_cloud_tts_api_key_summary">Required when Volcengine TTS is enabled</string>
+    <string name="pref_cloud_tts_api_key_configured">Configured</string>
+    <string name="pref_cloud_tts_resource_id">Volcengine resource ID</string>
+    <string name="pref_cloud_tts_speaker">Volcengine speaker</string>
+    <string name="pref_cloud_tts_speech_rate">Volcengine speech rate</string>
+    <string name="pref_cloud_tts_speech_rate_summary">Range -50 to 100, 100 is 2x speed, -50 is 0.5x speed</string>
+    <string name="pref_cloud_tts_emotion_scale">Volcengine emotion scale</string>
+    <string name="pref_cloud_tts_emotion_scale_summary">Range 1 to 5, default 1</string>
+    <string name="pref_cloud_tts_context_text">Context prompt</string>
+    <string name="pref_cloud_tts_context_text_summary">Sent as context_texts for TTS 2.0 resources</string>
+    <string name="pref_cloud_tts_max_sentences_per_request">Numbers per request</string>
+    <string name="pref_cloud_tts_max_sentences_per_request_summary">Range 1 to 50, higher values improve consistency but rely more on slicing</string>
+    <string name="pref_cloud_tts_max_concurrency">Request concurrency</string>
+    <string name="pref_cloud_tts_max_concurrency_summary">Range 1 to 10, lower values reduce throttling and ordering issues</string>
+
     <string name="pref_media_style_notification">Media Style Notification</string>
 
     <!--Reminder preferences-->

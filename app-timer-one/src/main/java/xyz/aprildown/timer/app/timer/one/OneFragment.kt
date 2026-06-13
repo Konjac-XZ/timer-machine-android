@@ -256,6 +256,8 @@ class OneFragment :
                     menuItem.updateState()
                 }
 
+                override fun onPrepareMenu(menu: Menu) = Unit
+
                 private fun MenuItem.updateState() {
                     when (
                         sharedPreferences.getString(

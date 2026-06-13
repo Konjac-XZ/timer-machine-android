@@ -456,4 +456,60 @@ object PreferenceData {
     var SharedPreferences.isTtsBakeryOpen: Boolean
         get() = getBoolean(PREF_IS_TTS_BAKERY_OPEN, AppConfig.openDebug)
         set(value) = edit { putBoolean(PREF_IS_TTS_BAKERY_OPEN, value) }
+
+    const val PREF_CLOUD_TTS_API_KEY = "pref_cloud_tts_api_key"
+    const val PREF_CLOUD_TTS_RESOURCE_ID = "pref_cloud_tts_resource_id"
+    const val PREF_CLOUD_TTS_SPEAKER = "pref_cloud_tts_speaker"
+    const val PREF_CLOUD_TTS_SPEECH_RATE = "pref_cloud_tts_speech_rate"
+    const val PREF_CLOUD_TTS_EMOTION_SCALE = "pref_cloud_tts_emotion_scale"
+    const val PREF_CLOUD_TTS_ENABLED = "pref_cloud_tts_enabled"
+    const val PREF_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST = "pref_cloud_tts_max_sentences_per_request"
+    const val PREF_CLOUD_TTS_MAX_CONCURRENCY = "pref_cloud_tts_max_concurrency"
+    const val PREF_CLOUD_TTS_CONTEXT_TEXT = "pref_cloud_tts_context_text"
+    const val CLOUD_TTS_DEFAULT_MAX_SENTENCES_PER_REQUEST = 10
+    const val CLOUD_TTS_MIN_SENTENCES_PER_REQUEST = 1
+    const val CLOUD_TTS_MAX_SENTENCES_PER_REQUEST = 50
+    const val CLOUD_TTS_DEFAULT_MAX_CONCURRENCY = 1
+    const val CLOUD_TTS_MIN_CONCURRENCY = 1
+    const val CLOUD_TTS_MAX_CONCURRENCY = 10
+    const val CLOUD_TTS_DEFAULT_CONTEXT_TEXT =
+        "这是倒计时播报。请保持稳定、中性的语气和节奏，不要加入额外感情。"
+
+    data class CloudTtsSettings(
+        val enabled: Boolean,
+        val apiKey: String,
+        val resourceId: String,
+        val speaker: String,
+        val speechRate: Int,
+        val emotionScale: Int,
+        val maxSentencesPerRequest: Int,
+        val maxConcurrency: Int,
+        val contextText: String,
+    ) {
+        val isConfigured: Boolean
+            get() = enabled && apiKey.isNotBlank() && resourceId.isNotBlank() && speaker.isNotBlank()
+    }
+
+    val SharedPreferences.cloudTtsSettings: CloudTtsSettings
+        get() = CloudTtsSettings(
+            enabled = getBoolean(PREF_CLOUD_TTS_ENABLED, false),
+            apiKey = getNonNullString(PREF_CLOUD_TTS_API_KEY, ""),
+            resourceId = getNonNullString(PREF_CLOUD_TTS_RESOURCE_ID, "seed-tts-2.0"),
+            speaker = getNonNullString(PREF_CLOUD_TTS_SPEAKER, "zh_female_vv_uranus_bigtts"),
+            speechRate = getNonNullString(PREF_CLOUD_TTS_SPEECH_RATE, "0").toIntOrNull() ?: 0,
+            emotionScale = getNonNullString(PREF_CLOUD_TTS_EMOTION_SCALE, "1").toIntOrNull() ?: 1,
+            maxSentencesPerRequest = getNonNullString(
+                PREF_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST,
+                CLOUD_TTS_DEFAULT_MAX_SENTENCES_PER_REQUEST.toString(),
+            ).toIntOrNull()
+                ?.coerceIn(CLOUD_TTS_MIN_SENTENCES_PER_REQUEST, CLOUD_TTS_MAX_SENTENCES_PER_REQUEST)
+                ?: CLOUD_TTS_DEFAULT_MAX_SENTENCES_PER_REQUEST,
+            maxConcurrency = getNonNullString(
+                PREF_CLOUD_TTS_MAX_CONCURRENCY,
+                CLOUD_TTS_DEFAULT_MAX_CONCURRENCY.toString(),
+            ).toIntOrNull()
+                ?.coerceIn(CLOUD_TTS_MIN_CONCURRENCY, CLOUD_TTS_MAX_CONCURRENCY)
+                ?: CLOUD_TTS_DEFAULT_MAX_CONCURRENCY,
+            contextText = getNonNullString(PREF_CLOUD_TTS_CONTEXT_TEXT, CLOUD_TTS_DEFAULT_CONTEXT_TEXT),
+        )
 }

@@ -2,6 +2,7 @@ package com.github.deweyreed.timer.component.tts
 
 import android.app.Application
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
@@ -11,13 +12,13 @@ import android.speech.tts.UtteranceProgressListener
 import android.text.format.DateUtils
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
-import androidx.core.os.bundleOf
 import androidx.core.os.postDelayed
 import com.github.deweyreed.timer.component.tts.TtsSpeaker.onDone
 import com.github.deweyreed.tools.anko.longToast
 import com.github.deweyreed.tools.helper.HandlerHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import xyz.aprildown.timer.app.base.R
 import xyz.aprildown.timer.app.base.data.PreferenceData
 import xyz.aprildown.timer.app.base.data.PreferenceData.isTtsBakeryOpen
@@ -284,15 +285,29 @@ private class WelcomingTextToSpeech(
 
         fireAndForget(Dispatchers.Main.immediate) {
             val isTtsBakeryOpen = application.safeSharedPreference.isTtsBakeryOpen
+            val textString = text.toString()
+            val speechText = TtsBakery.countdownSpeechText(textString)
 
-            val speechUri = withContext(Dispatchers.IO) {
-                getBakedCountUri(context = application, content = text)
-                    ?: if (isTtsBakeryOpen) {
-                        TtsBakery.getSpeechFile(application, text.toString())?.toUri()
-                    } else {
-                        null
-                    }
+            val speechSource = withContext(Dispatchers.IO) {
+                resolveSpeechSource(
+                    context = application,
+                    originalText = textString,
+                    speechText = speechText,
+                    isTtsBakeryOpen = isTtsBakeryOpen,
+                )
             }
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "Countdown TTS source=%s reason=%s text=%s speechText=%s bakeryOpen=%s",
+                    speechSource.sourceName,
+                    speechSource.reason,
+                    textString,
+                    speechText,
+                    isTtsBakeryOpen,
+                )
+
+            val speechUri = speechSource.uri
             if (speechUri != null) {
                 if (initialized) {
                     if (textToSpeech.isSpeaking) {
@@ -304,7 +319,7 @@ private class WelcomingTextToSpeech(
                     context = application,
                     uri = speechUri,
                     loop = false,
-                    audioFocusType = 0, // AudioManager.AUDIOFOCUS_NONE
+                    audioFocusType = application.storedAudioFocusType,
                     streamType = streamType
                 )
 
@@ -323,16 +338,28 @@ private class WelcomingTextToSpeech(
                 return@fireAndForget
             }
 
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setUsage(
+                    when (streamType) {
+                        AudioManager.STREAM_ALARM -> AudioAttributes.USAGE_ALARM
+                        AudioManager.STREAM_NOTIFICATION -> AudioAttributes.USAGE_NOTIFICATION
+                        AudioManager.STREAM_RING -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+                        else -> AudioAttributes.USAGE_MEDIA
+                    }
+                )
+                .build()
+
+            textToSpeech.setAudioAttributes(audioAttributes)
+
             textToSpeech.speak(
-                text,
+                speechText,
                 TextToSpeech.QUEUE_FLUSH,
-                bundleOf(
-                    TextToSpeech.Engine.KEY_PARAM_STREAM to streamType
-                ),
-                text.hashCode().toString()
+                null,
+                speechText.hashCode().toString()
             )
             if (isTtsBakeryOpen) {
-                TtsBakery.scheduleBaking(application, text.toString())
+                TtsBakery.scheduleBaking(application, speechText)
             }
         }
     }
@@ -348,6 +375,58 @@ private class WelcomingTextToSpeech(
     }
 }
 
+private data class SpeechSource(
+    val uri: Uri?,
+    val sourceName: String,
+    val reason: String,
+)
+
+private fun resolveSpeechSource(
+    context: Context,
+    originalText: String,
+    speechText: String,
+    isTtsBakeryOpen: Boolean,
+): SpeechSource {
+    if (isTtsBakeryOpen) {
+        val originalCacheFile = TtsBakery.getSpeechFile(context, originalText)
+        if (originalCacheFile != null) {
+            return SpeechSource(
+                uri = originalCacheFile.toUri(),
+                sourceName = "cloud-cache",
+                reason = "ttsBakeryOpen=true, originalTextCacheHit=true",
+            )
+        }
+
+        val speechCacheFile = TtsBakery.getSpeechFile(context, speechText)
+        if (speechCacheFile != null) {
+            return SpeechSource(
+                uri = speechCacheFile.toUri(),
+                sourceName = "cloud-cache",
+                reason = "ttsBakeryOpen=true, speechTextCacheHit=true",
+            )
+        }
+    }
+
+    val bakedCountUri = getBakedCountUri(context = context, content = originalText)
+    if (bakedCountUri != null) {
+        return SpeechSource(
+            uri = bakedCountUri,
+            sourceName = "baked-count",
+            reason = "builtInCountAudioHit=true",
+        )
+    }
+
+    return SpeechSource(
+        uri = null,
+        sourceName = "local-tts",
+        reason = if (isTtsBakeryOpen) {
+            "ttsBakeryOpen=true, cloudCacheMiss=true, builtInCountAudioHit=false"
+        } else {
+            "ttsBakeryOpen=false, builtInCountAudioHit=false"
+        },
+    )
+}
+
 private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
     if (content.length > 2) return null
     if ((content.toString().toIntOrNull() ?: -1) !in 0..20) return null
@@ -359,3 +438,5 @@ private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
 
     return file.toUri()
 }
+
+private const val TTS_LOG_TAG = "TtsSpeaker"

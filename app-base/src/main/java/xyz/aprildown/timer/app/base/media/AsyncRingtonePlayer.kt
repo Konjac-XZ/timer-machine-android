@@ -144,7 +144,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
 
             mExoPlayer = ExoPlayer.Builder(context).build()
             mExoPlayer?.addListener(
-                object : Player.Listener {
+                object : RingtonePlayerListener() {
                     override fun onPlayerError(error: PlaybackException) {
                         super.onPlayerError(error)
                         this@AsyncRingtonePlayer.stop()
@@ -215,7 +215,7 @@ internal class AsyncRingtonePlayer(private val mContext: Context) {
                 repeatMode = if (mLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
                 if (!mLoop) {
                     addListener(
-                        object : Player.Listener {
+                        object : RingtonePlayerListener() {
                             override fun onPlaybackStateChanged(playbackState: Int) {
                                 if (playbackState == Player.STATE_ENDED) {
                                     this@AsyncRingtonePlayer.stop()
@@ -348,6 +348,10 @@ private const val RINGTONE_URI_KEY = "RINGTONE_URI_KEY"
 private const val LOOP = "LOOP"
 private const val AUDIO_FOCUS_TYPE = "AUDIO_FOCUS_TYPE"
 private const val STREAM_TYPE = "STREAM_TYPE"
+
+private open class RingtonePlayerListener : Player.Listener {
+    override fun onEvents(player: Player, events: Player.Events) = Unit
+}
 
 /**
  * @return `true` iff the device is currently in a telephone call
