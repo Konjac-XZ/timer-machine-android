@@ -14,6 +14,7 @@
 - `./gradlew testDogDebugUnitTest` runs JVM unit tests across modules.
 - `./gradlew connectedDogDebugAndroidTest` runs Espresso UI tests.
 - `./gradlew generateBaselineProfile` regenerates the baseline profile set.
+- The compile toolchain is bundled with Android Studio, typically under `C:\Program Files\Android\Android Studio\jbr`; `JAVA_HOME` and `PATH` may not be preconfigured.
 
 ## Coding Style & Naming Conventions
 - Use Kotlin 4-space indentation; keep trailing commas and expression bodies when they clarify intent.
