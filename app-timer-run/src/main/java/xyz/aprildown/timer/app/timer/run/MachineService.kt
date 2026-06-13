@@ -36,8 +36,9 @@ import xyz.aprildown.timer.app.base.media.RingtonePreviewKlaxon
 import xyz.aprildown.timer.app.base.media.Torch
 import xyz.aprildown.timer.app.base.media.VibrateHelper
 import xyz.aprildown.timer.app.base.ui.AppNavigator
-import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.AppVisibilityTracker
+import xyz.aprildown.timer.app.base.utils.ChineseNumberUtils
+import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.produceHms
 import xyz.aprildown.timer.app.timer.run.receiver.SchedulerReceiver
 import xyz.aprildown.timer.app.timer.run.screen.ScreenActivity
@@ -397,23 +398,31 @@ class MachineService :
         val (hours, minutes, seconds) = duration.produceHms()
         return buildString {
             if (hours > 0) {
-                append(getNumberFormattedQuantityString(RBase.plurals.hours, hours))
+                append(getTtsTimeUnitString(hours, RBase.plurals.hours))
             }
             if (minutes > 0) {
                 if (isNotEmpty()) {
                     append(", ")
                 }
-                append(getNumberFormattedQuantityString(RBase.plurals.minutes, minutes))
+                append(getTtsTimeUnitString(minutes, RBase.plurals.minutes))
             }
             if (seconds > 0) {
                 if (isNotEmpty()) {
                     append(", ")
                 }
-                append(getNumberFormattedQuantityString(RBase.plurals.seconds, seconds))
+                append(getTtsTimeUnitString(seconds, RBase.plurals.seconds))
             }
             if (isEmpty()) {
                 append(getString(RBase.string.seconds_0))
             }
+        }
+    }
+
+    private fun getTtsTimeUnitString(value: Int, pluralResId: Int): String {
+        return if (ChineseNumberUtils.isChineseLocale()) {
+            resources.getQuantityString(pluralResId, value, ChineseNumberUtils.toChineseDigits(value))
+        } else {
+            getNumberFormattedQuantityString(pluralResId, value)
         }
     }
 
