@@ -93,7 +93,19 @@
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />
+            <meta-data
+                android:name="leakcanary.internal.AppWatcherInstaller$MainProcess"
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
+
+        <!-- Disable LeakCanary launcher icon -->
+        <activity-alias
+            android:name="leakcanary.internal.activity.LeakLauncherActivity"
+            android:enabled="false"
+            android:exported="false"
+            android:targetActivity=".ui.MainActivity"
+            tools:node="replace" />
 
     </application>
 
