@@ -1,6 +1,8 @@
 package xyz.aprildown.timer.app.base.utils
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import xyz.aprildown.timer.app.base.R
 import xyz.aprildown.timer.app.base.data.PreferenceData
@@ -8,11 +10,22 @@ import xyz.aprildown.tools.helper.safeSharedPreference
 
 object ScreenWakeLock {
     private const val LOG_TAG = "TimeR Machine: Screen WakeLock"
+    private const val RELEASE_DELAY_MS = 750L
 
     private var sScreenWakeLock: PowerManager.WakeLock? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val releaseRunnable = Runnable {
+        val wl = sScreenWakeLock
+        if (wl != null && wl.isHeld) {
+            wl.release()
+        }
+        sScreenWakeLock = null
+    }
 
     fun acquireScreenWakeLock(context: Context, screenTiming: String) {
         if (!isValidLocation(context, screenTiming)) return
+        mainHandler.removeCallbacks(releaseRunnable)
+        if (sScreenWakeLock?.isHeld == true) return
 
         fun getPowerManager(): PowerManager {
             return context.applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -54,10 +67,7 @@ object ScreenWakeLock {
     fun releaseScreenLock(context: Context, screenTiming: String) {
         if (!isValidLocation(context, screenTiming)) return
 
-        val wl = sScreenWakeLock
-        if (wl != null && wl.isHeld) {
-            wl.release()
-        }
-        sScreenWakeLock = null
+        mainHandler.removeCallbacks(releaseRunnable)
+        mainHandler.postDelayed(releaseRunnable, RELEASE_DELAY_MS)
     }
 }

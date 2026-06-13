@@ -37,6 +37,7 @@ import xyz.aprildown.timer.app.base.media.Torch
 import xyz.aprildown.timer.app.base.media.VibrateHelper
 import xyz.aprildown.timer.app.base.ui.AppNavigator
 import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
+import xyz.aprildown.timer.app.base.utils.AppVisibilityTracker
 import xyz.aprildown.timer.app.base.utils.produceHms
 import xyz.aprildown.timer.app.timer.run.receiver.SchedulerReceiver
 import xyz.aprildown.timer.app.timer.run.screen.ScreenActivity
@@ -357,9 +358,13 @@ class MachineService :
     }
 
     override fun showScreen(timerItem: TimerEntity, currentStepName: String, fullScreen: Boolean) {
+        val isForeground = AppVisibilityTracker.isAppInForeground()
+        if (isForeground) {
+            startActivity(ScreenActivity.intent(this, timerItem.id).newTask())
+            return
+        }
+
         if (fullScreen && Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // As restrictions on starting activities from the background get increasingly strict,
-            // this option becomes unpredictable. We'll have to rely on full-screen intent.
             startActivity(ScreenActivity.intent(this, timerItem.id).newTask())
         } else {
             notificationManager.notify(

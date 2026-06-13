@@ -25,6 +25,7 @@ import xyz.aprildown.timer.app.base.data.PreferenceData.disablePhoneCallBehavior
 import xyz.aprildown.timer.app.base.data.PreferenceData.shouldPausePhoneCall
 import xyz.aprildown.timer.app.base.data.PreferenceData.useVoiceContent2
 import xyz.aprildown.timer.app.base.utils.AppThemeUtils
+import xyz.aprildown.timer.app.base.utils.AppVisibilityTracker
 import xyz.aprildown.timer.app.base.utils.LogToFileTree
 import xyz.aprildown.timer.component.key.ImageActionMapper
 import xyz.aprildown.timer.data.job.initJob
@@ -59,6 +60,9 @@ class App : Application(), WorkManagerConfiguration.Provider, SingletonImageLoad
         super.onCreate()
 
         migrateSharedPreferences()
+
+        // Track app foreground/background state for runtime decisions.
+        AppVisibilityTracker.init(this)
 
         setUpAnalytics()
         setUpLogger()

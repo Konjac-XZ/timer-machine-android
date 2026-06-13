@@ -34,6 +34,7 @@ import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.ui.BaseActivity
 import xyz.aprildown.timer.app.base.ui.newDynamicTheme
 import xyz.aprildown.timer.app.base.utils.AppThemeUtils
+import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.setTime
 import xyz.aprildown.timer.app.timer.run.MachineService
 import xyz.aprildown.timer.app.timer.run.databinding.ActivityScreenBinding
@@ -42,6 +43,7 @@ import xyz.aprildown.timer.domain.entities.StepType
 import xyz.aprildown.timer.domain.utils.Constants
 import xyz.aprildown.timer.presentation.screen.ScreenViewModel
 import xyz.aprildown.timer.presentation.stream.MachineContract
+import xyz.aprildown.timer.app.base.R as RBase
 import com.github.deweyreed.tools.R as RTools
 
 @AndroidEntryPoint
@@ -175,8 +177,7 @@ class ScreenActivity : BaseActivity() {
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
         )
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -405,9 +406,16 @@ class ScreenActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+
+        // Acquire wake lock to keep screen on reliably across all devices
+        ScreenWakeLock.acquireScreenWakeLock(
+            context = this,
+            screenTiming = getString(RBase.string.pref_screen_timing_value_timer)
+        )
+
         // Re-hide system bars when returning to the activity
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-        
+
         binding.imageRingtone.post {
             if (binding.imageRingtone.isVisible) {
                 binding.imageRingtone.startDrawableAnimation()
@@ -422,6 +430,13 @@ class ScreenActivity : BaseActivity() {
     override fun onPause() {
         binding.imageRingtone.stopDrawableAnimation()
         stopSmoothAnimation()
+
+        // Release wake lock when activity is no longer visible
+        ScreenWakeLock.releaseScreenLock(
+            context = this,
+            screenTiming = getString(RBase.string.pref_screen_timing_value_timer)
+        )
+
         super.onPause()
     }
 
@@ -429,6 +444,13 @@ class ScreenActivity : BaseActivity() {
         stopSmoothAnimation()
         unbindService(mConnection)
         viewModel.dropPresenter()
+
+        // Release wake lock as a safety measure
+        ScreenWakeLock.releaseScreenLock(
+            context = this,
+            screenTiming = getString(RBase.string.pref_screen_timing_value_timer)
+        )
+
         screen = null
         super.onDestroy()
     }
