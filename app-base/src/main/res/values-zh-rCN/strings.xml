@@ -526,15 +526,24 @@
     <string name="pref_cloud_tts_enabled">使用火山引擎语音合成</string>
     <string name="pref_cloud_tts_enabled_on">倒数预生成会在配置完整时使用火山引擎</string>
     <string name="pref_cloud_tts_enabled_off">倒数预生成使用设备本地文字转语音</string>
+    <string name="pref_cloud_tts_category_access">鉴权与音色</string>
+    <string name="pref_cloud_tts_category_voice">语音表现</string>
+    <string name="pref_cloud_tts_category_batching">倒计时批量合成</string>
     <string name="pref_cloud_tts_api_key">火山引擎 API Key</string>
     <string name="pref_cloud_tts_api_key_summary">启用火山引擎语音合成时必填</string>
     <string name="pref_cloud_tts_api_key_configured">已配置</string>
     <string name="pref_cloud_tts_resource_id">火山引擎资源 ID</string>
     <string name="pref_cloud_tts_speaker">火山引擎音色</string>
     <string name="pref_cloud_tts_speech_rate">火山引擎语速</string>
-    <string name="pref_cloud_tts_speech_rate_summary">范围：-50 到 100。100 表示 2 倍速，-50 表示 0.5 倍速。</string>
+    <string name="pref_cloud_tts_speech_rate_summary">范围 -50 到 100，100 表示 2 倍速，-50 表示 0.5 倍速</string>
     <string name="pref_cloud_tts_emotion_scale">火山引擎情感强度</string>
-    <string name="pref_cloud_tts_emotion_scale_summary">范围：1 到 5。默认：1。</string>
+    <string name="pref_cloud_tts_emotion_scale_summary">范围 1 到 5，默认 1</string>
+    <string name="pref_cloud_tts_context_text">上下文提示词</string>
+    <string name="pref_cloud_tts_context_text_summary">作为 TTS 2.0 资源的 context_texts 发送</string>
+    <string name="pref_cloud_tts_max_sentences_per_request">单请求数字数量</string>
+    <string name="pref_cloud_tts_max_sentences_per_request_summary">范围 1 到 50，越高一致性越好但越依赖切片</string>
+    <string name="pref_cloud_tts_max_concurrency">请求并发数量</string>
+    <string name="pref_cloud_tts_max_concurrency_summary">范围 1 到 10，越低越不容易触发限流和乱序问题</string>
     <string name="pref_media_style_notification">媒体样式通知</string>
     <!--Reminder preferences-->
     <string name="pref_reminder">提醒方式</string>

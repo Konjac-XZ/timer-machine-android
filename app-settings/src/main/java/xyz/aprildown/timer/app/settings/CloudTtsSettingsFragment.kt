@@ -37,10 +37,31 @@ class CloudTtsSettingsFragment :
                 if (value == null || value !in 1..5) return false
                 clearTtsCache()
             }
+            KEY_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST -> {
+                val value = newValue?.toString()?.toIntOrNull()
+                if (value == null ||
+                    value !in PreferenceData.CLOUD_TTS_MIN_SENTENCES_PER_REQUEST..
+                    PreferenceData.CLOUD_TTS_MAX_SENTENCES_PER_REQUEST
+                ) {
+                    return false
+                }
+                clearTtsCache()
+            }
+            KEY_CLOUD_TTS_MAX_CONCURRENCY -> {
+                val value = newValue?.toString()?.toIntOrNull()
+                if (value == null ||
+                    value !in PreferenceData.CLOUD_TTS_MIN_CONCURRENCY..
+                    PreferenceData.CLOUD_TTS_MAX_CONCURRENCY
+                ) {
+                    return false
+                }
+                clearTtsCache()
+            }
             KEY_CLOUD_TTS_ENABLED,
             KEY_CLOUD_TTS_API_KEY,
             KEY_CLOUD_TTS_RESOURCE_ID,
-            KEY_CLOUD_TTS_SPEAKER -> {
+            KEY_CLOUD_TTS_SPEAKER,
+            KEY_CLOUD_TTS_CONTEXT_TEXT -> {
                 clearTtsCache()
             }
         }
@@ -86,6 +107,25 @@ class CloudTtsSettingsFragment :
             }
             onPreferenceChangeListener = this@CloudTtsSettingsFragment
         }
+        findPreference<EditTextPreference>(KEY_CLOUD_TTS_CONTEXT_TEXT)?.run {
+            setOnBindEditTextListener {
+                it.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                it.setSingleLine(false)
+            }
+            onPreferenceChangeListener = this@CloudTtsSettingsFragment
+        }
+        findPreference<EditTextPreference>(KEY_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST)?.run {
+            setOnBindEditTextListener {
+                it.inputType = InputType.TYPE_CLASS_NUMBER
+            }
+            onPreferenceChangeListener = this@CloudTtsSettingsFragment
+        }
+        findPreference<EditTextPreference>(KEY_CLOUD_TTS_MAX_CONCURRENCY)?.run {
+            setOnBindEditTextListener {
+                it.inputType = InputType.TYPE_CLASS_NUMBER
+            }
+            onPreferenceChangeListener = this@CloudTtsSettingsFragment
+        }
     }
 
     private fun clearTtsCache() {
@@ -102,3 +142,7 @@ private const val KEY_CLOUD_TTS_RESOURCE_ID = PreferenceData.PREF_CLOUD_TTS_RESO
 private const val KEY_CLOUD_TTS_SPEAKER = PreferenceData.PREF_CLOUD_TTS_SPEAKER
 private const val KEY_CLOUD_TTS_SPEECH_RATE = PreferenceData.PREF_CLOUD_TTS_SPEECH_RATE
 private const val KEY_CLOUD_TTS_EMOTION_SCALE = PreferenceData.PREF_CLOUD_TTS_EMOTION_SCALE
+private const val KEY_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST =
+    PreferenceData.PREF_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST
+private const val KEY_CLOUD_TTS_MAX_CONCURRENCY = PreferenceData.PREF_CLOUD_TTS_MAX_CONCURRENCY
+private const val KEY_CLOUD_TTS_CONTEXT_TEXT = PreferenceData.PREF_CLOUD_TTS_CONTEXT_TEXT
