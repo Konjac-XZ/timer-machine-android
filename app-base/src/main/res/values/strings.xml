@@ -695,6 +695,7 @@
     <string name="pref_tts_prerender_dialog_message">Enter the maximum countdown number to pre-render.</string>
     <string name="pref_tts_prerender_dialog_message_cloud">Enter the maximum countdown number to pre-render with cloud TTS.</string>
     <string name="pref_tts_prerender_dialog_hint">Maximum count</string>
+    <string name="pref_tts_prerender_cloud_batching">Requesting cloud batch synthesis…</string>
     <string name="pref_tts_prerender_progress">Rendering audio %1$d of %2$d…</string>
     <string name="pref_tts_prerender_completed">Rendered %1$d of %2$d audio files</string>
     <string name="pref_tts_prerender_completed_with_failures">Rendered %1$d of %2$d audio files; %3$d failed</string>

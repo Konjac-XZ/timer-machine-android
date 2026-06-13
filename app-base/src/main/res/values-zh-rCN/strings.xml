@@ -508,6 +508,7 @@
     <string name="pref_tts_prerender_dialog_message">输入要预生成的最大倒数数字</string>
     <string name="pref_tts_prerender_dialog_message_cloud">输入要通过云端语音合成预生成的最大倒数数字</string>
     <string name="pref_tts_prerender_dialog_hint">最大数字</string>
+    <string name="pref_tts_prerender_cloud_batching">正在请求云端批量合成…</string>
     <string name="pref_tts_prerender_progress">正在生成第 %1$d/%2$d 个语音…</string>
     <string name="pref_tts_prerender_completed">已生成 %1$d/%2$d 个语音文件</string>
     <string name="pref_tts_prerender_completed_with_failures">已生成 %1$d/%2$d 个语音文件；%3$d 个失败</string>

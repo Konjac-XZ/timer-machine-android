@@ -416,6 +416,11 @@ class SettingsFragment :
             TtsBakery.countdownPrerenderState.collectLatest { state ->
                 when (state) {
                     TtsBakery.CountdownPrerenderState.Idle -> Unit
+                    TtsBakery.CountdownPrerenderState.Batching -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_notification_title)
+                        progressTextView.setText(RBase.string.pref_tts_prerender_cloud_batching)
+                        progressBar.isIndeterminate = true
+                    }
                     is TtsBakery.CountdownPrerenderState.Running -> {
                         titleView.setText(RBase.string.pref_tts_prerender_notification_title)
                         progressTextView.text = getString(

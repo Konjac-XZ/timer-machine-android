@@ -61,6 +61,8 @@ object TtsBakery {
     sealed interface CountdownPrerenderState {
         data object Idle : CountdownPrerenderState
 
+        data object Batching : CountdownPrerenderState
+
         data class Running(
             val current: Int,
             val total: Int,
@@ -107,11 +109,17 @@ object TtsBakery {
 
         val appContext = context.applicationContext
         val texts = (count downTo 1).map { value -> countdownSpeechText(value.toString()) }
-        mutableCountdownPrerenderState.value = CountdownPrerenderState.Running(
-            current = 0,
-            total = texts.size,
-        )
-        notifyCountdownPrerenderProgress(appContext, current = 0, total = texts.size)
+        val cloudTtsSettings = appContext.safeSharedPreference.cloudTtsSettings
+        if (cloudTtsSettings.isConfigured) {
+            mutableCountdownPrerenderState.value = CountdownPrerenderState.Batching
+            notifyCountdownPrerenderBatching(appContext)
+        } else {
+            mutableCountdownPrerenderState.value = CountdownPrerenderState.Running(
+                current = 0,
+                total = texts.size,
+            )
+            notifyCountdownPrerenderProgress(appContext, current = 0, total = texts.size)
+        }
         prerenderJob = prerenderScope.launch {
             bakeMultipleImmediately(
                 context = appContext,
@@ -135,6 +143,27 @@ object TtsBakery {
             }
         }
         return true
+    }
+
+    private fun notifyCountdownPrerenderBatching(context: Context) {
+        if (!context.canPostNotifications()) return
+
+        val notificationManager = NotificationManagerCompat.from(context)
+        notificationManager.createAppInfoChannelIfNecessary(context)
+        notificationManager.notify(
+            COUNTDOWN_PRERENDER_NOTIFICATION_ID,
+            NotificationCompat.Builder(context, Constants.CHANNEL_APP_INFO_NOTIFICATION)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.pref_tts_prerender_notification_title))
+                .setContentText(context.getString(R.string.pref_tts_prerender_cloud_batching))
+                .setProgress(0, 0, true)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setLocalOnly(true)
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build()
+        )
     }
 
     private fun notifyCountdownPrerenderProgress(context: Context, current: Int, total: Int) {
