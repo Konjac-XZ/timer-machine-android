@@ -365,7 +365,7 @@ private class WelcomingTextToSpeech(
                     context = application,
                     uri = speechUri,
                     loop = false,
-                    audioFocusType = application.storedAudioFocusType,
+                    audioFocusType = COUNTDOWN_CACHE_AUDIO_FOCUS_TYPE,
                     streamType = streamType,
                     onComplete = {
                         Log.i(
@@ -627,6 +627,7 @@ private fun getBakedCountSource(context: Context, content: CharSequence): BakedC
 private const val TTS_LOG_TAG = "TtsSpeaker"
 private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
 private const val CACHE_PLAYBACK_DONE_FALLBACK_MS = 1_500L
+private const val COUNTDOWN_CACHE_AUDIO_FOCUS_TYPE = AudioManager.AUDIOFOCUS_NONE
 
 private fun CharSequence.toLogText(): String = "\"${toString().replace("\n", "\\n")}\""
 
