@@ -346,6 +346,12 @@ class UpdateStepDialog :
                     addCountItems(
                         context = context,
                         action = current.toCountAction(),
+                        onFullCountdown = { newFullCountdown ->
+                            changeBehaviour(BehaviourType.COUNT) {
+                                it.toCountAction().copy(fullCountdown = newFullCountdown)
+                                    .toBehaviourEntity()
+                            }
+                        },
                         onCountTimes = { newTimes ->
                             changeBehaviour(BehaviourType.COUNT) {
                                 it.toCountAction().copy(times = newTimes).toBehaviourEntity()

@@ -69,8 +69,12 @@ internal fun BehaviourEntity.getChipText(context: Context): String {
             }
         }
         BehaviourType.COUNT -> {
-            val times = toCountAction().times
-            if (times != CountAction.DEFAULT_TIMES) "${getDefaultName()} $times" else null
+            val action = toCountAction()
+            when {
+                action.fullCountdown -> context.getString(RBase.string.count_full_countdown)
+                action.times != CountAction.DEFAULT_TIMES -> "${getDefaultName()} ${action.times}"
+                else -> null
+            }
         }
         BehaviourType.NOTIFICATION -> {
             val duration = toNotificationAction().duration

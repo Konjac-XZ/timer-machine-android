@@ -222,6 +222,7 @@
     <string name="half_content">一半时间</string>
     <string name="behaviour_count">倒数</string>
     <string name="behaviour_count_help">倒数最后几秒钟</string>
+    <string name="count_full_countdown">全程倒数</string>
     <string name="count_times">倒数次数</string>
     <string name="count_times_desp">* 输入步骤结束时，倒数的次数</string>
     <string name="behaviour_notification">通知</string>

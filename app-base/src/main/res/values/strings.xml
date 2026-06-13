@@ -277,6 +277,7 @@
 
     <string name="behaviour_count">Count</string>
     <string name="behaviour_count_help">Count down the last several seconds</string>
+    <string name="count_full_countdown">Full countdown</string>
     <string name="count_times">Count Times</string>
     <string name="count_times_desp">* Enter the number of countdown seconds at the end of the step</string>
 

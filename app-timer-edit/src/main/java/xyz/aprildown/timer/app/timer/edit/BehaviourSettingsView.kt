@@ -244,20 +244,32 @@ internal fun MaterialPopupMenuBuilder.addHalfItems(
 internal fun MaterialPopupMenuBuilder.addCountItems(
     context: Context,
     action: CountAction,
+    onFullCountdown: (Boolean) -> Unit,
     onCountTimes: (Int) -> Unit,
     onBeep: (Boolean) -> Unit,
 ) {
     section {
-        item {
-            label = "${context.getString(RBase.string.count_times)}: ${action.times}"
-            callback = {
-                SimpleInputDialog(context).show(
-                    titleRes = RBase.string.count_times,
-                    preFill = action.times.toString(),
-                    inputType = InputType.TYPE_CLASS_NUMBER,
-                    messageRes = RBase.string.count_times_desp
-                ) {
-                    onCountTimes.invoke(it.toIntOrNull() ?: CountAction.DEFAULT_TIMES)
+        switchItem {
+            label = context.getString(RBase.string.count_full_countdown)
+            onBind = {
+                it.isChecked = action.fullCountdown
+            }
+            onCheckedChange = { _, isChecked ->
+                onFullCountdown.invoke(isChecked)
+            }
+        }
+        if (!action.fullCountdown) {
+            item {
+                label = "${context.getString(RBase.string.count_times)}: ${action.times}"
+                callback = {
+                    SimpleInputDialog(context).show(
+                        titleRes = RBase.string.count_times,
+                        preFill = action.times.toString(),
+                        inputType = InputType.TYPE_CLASS_NUMBER,
+                        messageRes = RBase.string.count_times_desp
+                    ) {
+                        onCountTimes.invoke(it.toIntOrNull() ?: CountAction.DEFAULT_TIMES)
+                    }
                 }
             }
         }

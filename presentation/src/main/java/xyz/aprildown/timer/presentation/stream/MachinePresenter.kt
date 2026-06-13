@@ -330,7 +330,7 @@ class MachinePresenter @Inject constructor(
                             if (action.beep) {
                                 view?.enableTone(
                                     tone = 0,
-                                    count = action.times,
+                                    count = action.getCountTimes(currentStep.length),
                                     respectOtherSound = true,
                                 )
                             }

@@ -790,6 +790,12 @@ class EditActivity :
                     addCountItems(
                         context = this@EditActivity,
                         action = current.toCountAction(),
+                        onFullCountdown = { newFullCountdown ->
+                            changeBehaviour(BehaviourType.COUNT, position) {
+                                it.toCountAction().copy(fullCountdown = newFullCountdown)
+                                    .toBehaviourEntity()
+                            }
+                        },
                         onCountTimes = { newTimes ->
                             changeBehaviour(BehaviourType.COUNT, position) {
                                 it.toCountAction().copy(times = newTimes).toBehaviourEntity()

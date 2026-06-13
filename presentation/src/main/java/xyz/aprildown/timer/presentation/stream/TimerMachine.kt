@@ -160,7 +160,7 @@ internal class TimerMachine(
                             val action = behaviour.toCountAction()
                             addTickListener(
                                 CountTickListener(
-                                    times = action.times,
+                                    times = action.getCountTimes(length),
                                     count = if (action.beep) {
                                         {
                                             if (it.isNotBlank()) {

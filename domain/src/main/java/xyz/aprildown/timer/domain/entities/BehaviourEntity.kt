@@ -20,6 +20,7 @@ package xyz.aprildown.timer.domain.entities
  *     str1: half option
  * COUNT:
  *     str1: count the last n seconds
+ *     bool: count throughout the whole step
  * NOTIFICATION:
  *     str1: last n seconds, 0 for always
  * FLASHLIGHT:
@@ -316,12 +317,22 @@ fun BehaviourEntity.toHalfAction(): HalfAction {
 data class CountAction(
     val times: Int = DEFAULT_TIMES,
     val beep: Boolean = false,
+    val fullCountdown: Boolean = true,
 ) : Action {
+    fun getCountTimes(stepLength: Long): Int {
+        return if (fullCountdown) {
+            (stepLength / 1000L + if (stepLength % 1000L == 0L) 0L else 1L).toInt()
+        } else {
+            times
+        }
+    }
+
     override fun toBehaviourEntity(): BehaviourEntity {
         return BehaviourEntity(
             BehaviourType.COUNT,
             str1 = if (times == DEFAULT_TIMES) "" else times.toString(),
             str2 = if (beep) "1" else "0",
+            bool = fullCountdown,
         )
     }
 
@@ -335,6 +346,7 @@ fun BehaviourEntity.toCountAction(): CountAction {
     return CountAction(
         times = str1.toIntOrNull() ?: CountAction.DEFAULT_TIMES,
         beep = str2 == "1",
+        fullCountdown = bool,
     )
 }
 
