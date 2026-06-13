@@ -284,14 +284,17 @@ private class WelcomingTextToSpeech(
 
         fireAndForget(Dispatchers.Main.immediate) {
             val isTtsBakeryOpen = application.safeSharedPreference.isTtsBakeryOpen
+            val textString = text.toString()
+            val speechText = TtsBakery.countdownSpeechText(textString)
 
             val speechUri = withContext(Dispatchers.IO) {
-                getBakedCountUri(context = application, content = text)
-                    ?: if (isTtsBakeryOpen) {
-                        TtsBakery.getSpeechFile(application, text.toString())?.toUri()
-                    } else {
-                        null
-                    }
+                if (isTtsBakeryOpen) {
+                    TtsBakery.getSpeechFile(application, textString)?.toUri()
+                        ?: TtsBakery.getSpeechFile(application, speechText)?.toUri()
+                        ?: getBakedCountUri(context = application, content = textString)
+                } else {
+                    getBakedCountUri(context = application, content = textString)
+                }
             }
             if (speechUri != null) {
                 if (initialized) {
@@ -338,13 +341,13 @@ private class WelcomingTextToSpeech(
             textToSpeech.setAudioAttributes(audioAttributes)
 
             textToSpeech.speak(
-                text,
+                speechText,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
-                text.hashCode().toString()
+                speechText.hashCode().toString()
             )
             if (isTtsBakeryOpen) {
-                TtsBakery.scheduleBaking(application, text.toString())
+                TtsBakery.scheduleBaking(application, speechText)
             }
         }
     }

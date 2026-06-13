@@ -16,5 +16,7 @@ dependencies {
     implementation(libs.hilt.work)
     ksp(libs.hilt.work.compiler)
 
+    implementation(libs.moshi.core)
+    implementation(libs.okhttp)
     implementation(libs.diskLruCache)
 }

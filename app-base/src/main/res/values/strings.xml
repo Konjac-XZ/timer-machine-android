@@ -693,6 +693,7 @@
     <string name="pref_tts_prerender_title">Pre-render countdown audio</string>
     <string name="pref_tts_prerender_dialog_title">Pre-render Count</string>
     <string name="pref_tts_prerender_dialog_message">Enter the maximum countdown number to pre-render.</string>
+    <string name="pref_tts_prerender_dialog_message_cloud">Enter the maximum countdown number to pre-render with cloud TTS.</string>
     <string name="pref_tts_prerender_dialog_hint">Maximum count</string>
     <string name="pref_tts_prerender_progress">Rendering audio %1$d of %2$d…</string>
     <string name="pref_tts_prerender_completed">Rendered %1$d of %2$d audio files</string>
@@ -706,6 +707,13 @@
     <string name="pref_tts_clear_cache_summary">Delete generated speech files and rebuild them when needed</string>
     <string name="pref_tts_clear_cache_confirmation">Delete all generated text-to-speech audio files?</string>
     <string name="pref_tts_clear_cache_done">Text-to-speech cache cleared</string>
+    <string name="pref_cloud_tts_api_key">Volcengine API Key</string>
+    <string name="pref_cloud_tts_api_key_summary">Used only for countdown pre-rendering. Leave empty to use the device TTS engine.</string>
+    <string name="pref_cloud_tts_api_key_configured">Configured</string>
+    <string name="pref_cloud_tts_resource_id">Volcengine resource ID</string>
+    <string name="pref_cloud_tts_speaker">Volcengine speaker</string>
+    <string name="pref_cloud_tts_speech_rate">Volcengine speech rate</string>
+    <string name="pref_cloud_tts_speech_rate_summary">Range: -50 to 100. 100 is 2x speed; -50 is 0.5x speed.</string>
 
     <string name="pref_media_style_notification">Media Style Notification</string>
 

@@ -31,6 +31,9 @@ import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import xyz.aprildown.timer.app.base.R
 import xyz.aprildown.timer.domain.utils.Constants
+import xyz.aprildown.timer.app.base.data.PreferenceData.cloudTtsSettings
+import xyz.aprildown.timer.app.base.utils.ChineseNumberUtils
+import xyz.aprildown.tools.helper.safeSharedPreference
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -97,7 +100,7 @@ object TtsBakery {
         if (prerenderJob?.isActive == true) return false
 
         val appContext = context.applicationContext
-        val texts = (count downTo 1).map(Int::toString)
+        val texts = (count downTo 1).map { value -> countdownSpeechText(value.toString()) }
         mutableCountdownPrerenderState.value = CountdownPrerenderState.Running(
             current = 0,
             total = texts.size,
@@ -195,9 +198,15 @@ object TtsBakery {
         var tts: TextToSpeech? = null
         var successCount = 0
         var failedCount = 0
+        val cloudTtsSettings = context.safeSharedPreference.cloudTtsSettings
+        val cloudTtsClient = cloudTtsSettings
+            .takeIf { it.isConfigured }
+            ?.let(::VolcengineTtsClient)
 
         return try {
-            tts = createTextToSpeech(context)
+            if (cloudTtsClient == null) {
+                tts = createTextToSpeech(context)
+            }
             texts.forEachIndexed { index, text ->
                 val current = index + 1
                 if (text.isBlank() || TtsBakeryDiskCache.get(context, text) != null) {
@@ -207,8 +216,13 @@ object TtsBakery {
                 }
 
                 runCatching {
-                    val file = createTempSpeechFile(context)
-                    synthesizeToFile(tts, text, file)
+                    val file = if (cloudTtsClient != null) {
+                        cloudTtsClient.synthesizeToFile(context, text)
+                    } else {
+                        val file = createTempSpeechFile(context)
+                        synthesizeToFile(checkNotNull(tts), text, file)
+                        file
+                    }
                     TtsBakeryDiskCache.put(context, text, file)
                 }.onSuccess {
                     successCount++
@@ -313,5 +327,13 @@ object TtsBakery {
 
     fun tearDown(context: Context) {
         TtsBakeryDiskCache.deleteAll(context)
+    }
+
+    fun countdownSpeechText(text: String): String {
+        return if (ChineseNumberUtils.isChineseLocale() && text.all(Char::isDigit)) {
+            ChineseNumberUtils.toChineseDigits(text.toInt())
+        } else {
+            text
+        }
     }
 }

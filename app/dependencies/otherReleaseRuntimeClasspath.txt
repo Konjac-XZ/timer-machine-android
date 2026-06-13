@@ -159,8 +159,10 @@ androidx.viewpager:viewpager:1.0.0
 androidx.window:window:1.0.0
 androidx.work:work-runtime-ktx:2.10.2
 androidx.work:work-runtime:2.10.2
-com.afollestad.material-dialogs:commons:0.9.6.0
-com.afollestad.material-dialogs:core:0.9.6.0
+com.afollestad.material-dialogs:color:3.3.0
+com.afollestad.material-dialogs:core:3.3.0
+com.afollestad.material-dialogs:lifecycle:3.3.0
+com.afollestad:viewpagerdots:1.0.0
 com.github.Carbs0126:NumberPickerView:642c376
 com.github.DeweyReed:ChromeMenu:0.2.0
 com.github.DeweyReed:HmsPickerView:0.2.0
@@ -198,6 +200,7 @@ com.mikepenz:materialdrawer:8.4.5
 com.mikepenz:materialize:1.2.1
 com.nex3z:toggle-button-group:1.2.3
 com.squareup.moshi:moshi:1.15.2
+com.squareup.okhttp3:okhttp:4.12.0
 com.squareup.okio:okio-jvm:3.15.0
 com.squareup.okio:okio:3.15.0
 dev.drewhamilton.poko:poko-annotations-jvm:0.15.2
@@ -213,7 +216,6 @@ io.coil-kt.coil3:coil-gif:3.2.0
 io.coil-kt.coil3:coil:3.2.0
 jakarta.inject:jakarta.inject-api:2.0.1
 javax.inject:javax.inject:1
-me.zhanghai.android.materialprogressbar:library:1.4.2
 net.engawapg.lib:zoomable:1.6.1
 nl.dionsegijn:konfetti:1.3.2
 org.jetbrains.androidx.lifecycle:lifecycle-common:2.8.4

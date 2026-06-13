@@ -506,6 +506,7 @@
     <string name="pref_tts_prerender_title">预生成倒数语音</string>
     <string name="pref_tts_prerender_dialog_title">预生成数量</string>
     <string name="pref_tts_prerender_dialog_message">输入要预生成的最大倒数数字</string>
+    <string name="pref_tts_prerender_dialog_message_cloud">输入要通过云端语音合成预生成的最大倒数数字</string>
     <string name="pref_tts_prerender_dialog_hint">最大数字</string>
     <string name="pref_tts_prerender_progress">正在生成第 %1$d/%2$d 个语音…</string>
     <string name="pref_tts_prerender_completed">已生成 %1$d/%2$d 个语音文件</string>
@@ -519,6 +520,13 @@
     <string name="pref_tts_clear_cache_summary">删除已生成的语音文件，需要时重新生成</string>
     <string name="pref_tts_clear_cache_confirmation">删除所有已生成的文字转语音音频文件？</string>
     <string name="pref_tts_clear_cache_done">文字转语音缓存已清空</string>
+    <string name="pref_cloud_tts_api_key">火山引擎 API Key</string>
+    <string name="pref_cloud_tts_api_key_summary">仅用于预生成倒数语音。留空时使用设备本地文字转语音。</string>
+    <string name="pref_cloud_tts_api_key_configured">已配置</string>
+    <string name="pref_cloud_tts_resource_id">火山引擎资源 ID</string>
+    <string name="pref_cloud_tts_speaker">火山引擎音色</string>
+    <string name="pref_cloud_tts_speech_rate">火山引擎语速</string>
+    <string name="pref_cloud_tts_speech_rate_summary">范围：-50 到 100。100 表示 2 倍速，-50 表示 0.5 倍速。</string>
     <string name="pref_media_style_notification">媒体样式通知</string>
     <!--Reminder preferences-->
     <string name="pref_reminder">提醒方式</string>

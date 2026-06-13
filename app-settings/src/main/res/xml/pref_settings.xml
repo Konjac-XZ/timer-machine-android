@@ -136,6 +136,41 @@
             app:summary="@string/pref_tts_clear_cache_summary"
             app:title="@string/pref_tts_clear_cache" />
 
+        <EditTextPreference
+            app:dependency="pref_is_tts_bakery_open"
+            app:icon="@drawable/settings_code"
+            app:key="pref_cloud_tts_api_key"
+            app:singleLineTitle="false"
+            app:summary="@string/pref_cloud_tts_api_key_summary"
+            app:title="@string/pref_cloud_tts_api_key" />
+
+        <EditTextPreference
+            app:dependency="pref_is_tts_bakery_open"
+            app:defaultValue="seed-tts-2.0"
+            app:icon="@drawable/settings_code"
+            app:key="pref_cloud_tts_resource_id"
+            app:singleLineTitle="false"
+            app:useSimpleSummaryProvider="true"
+            app:title="@string/pref_cloud_tts_resource_id" />
+
+        <EditTextPreference
+            app:dependency="pref_is_tts_bakery_open"
+            app:defaultValue="zh_female_cancan_mars_bigtts"
+            app:icon="@drawable/settings_voice"
+            app:key="pref_cloud_tts_speaker"
+            app:singleLineTitle="false"
+            app:useSimpleSummaryProvider="true"
+            app:title="@string/pref_cloud_tts_speaker" />
+
+        <EditTextPreference
+            app:dependency="pref_is_tts_bakery_open"
+            app:defaultValue="0"
+            app:icon="@drawable/settings_tweak_time"
+            app:key="pref_cloud_tts_speech_rate"
+            app:singleLineTitle="false"
+            app:summary="@string/pref_cloud_tts_speech_rate_summary"
+            app:title="@string/pref_cloud_tts_speech_rate" />
+
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_category_title_scheduler_setting">
