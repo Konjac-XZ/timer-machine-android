@@ -119,12 +119,16 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis batch response: batch=%d/%d audioBytes=%d sentences=%d words=%d sentencesDetail=%s wordsDetail=%s",
+                "Timed synthesis batch response: batch=%d/%d audioBytes=%d audioDuration=%.3f sentences=%d words=%d subtitleEnd=%.3f trailingAudio=%.3f sentencesDetail=%s wordsDetail=%s",
                 batchIndex + 1,
                 batchCount,
                 synthesisResult.audio.size,
+                synthesisResult.audio.pcmDurationSeconds(sampleRate = SAMPLE_RATE),
                 synthesisResult.subtitles.size,
                 words.size,
+                synthesisResult.subtitles.maxOfOrNull { it.endSeconds } ?: 0.0,
+                synthesisResult.audio.pcmDurationSeconds(sampleRate = SAMPLE_RATE) -
+                    (synthesisResult.subtitles.maxOfOrNull { it.endSeconds } ?: 0.0),
                 synthesisResult.subtitles.debugSubtitlesByIndex(),
                 words.debugWordsAround(index = 0, radius = DEBUG_WORDS_FULL_BATCH_RADIUS),
             )
@@ -342,17 +346,8 @@ internal class VolcengineTtsClient(
             if (subtitle != null) {
                 subtitles += subtitle
                 subtitleFrameCount++
-            } else if (!hasAudio && frame["code"] !is Number) {
-                Timber
-                    .tag(TTS_LOG_TAG)
-                    .i(
-                        "Parsed synthesis non-audio frame without subtitle: frame=%d keys=%s sentenceType=%s wordsType=%s event=%s",
-                        frameCount,
-                        frame.keys.joinToString(separator = "|"),
-                        frame["sentence"]?.javaClass?.simpleName,
-                        frame["words"]?.javaClass?.simpleName,
-                        frame["event"],
-                    )
+            } else if (!hasAudio) {
+                frame.logUnparsedTextFrame(source = "chunked", frame = frameCount.toString())
             }
             if (frame["code"] is Number) {
                 finalStatus = frame
@@ -414,16 +409,8 @@ internal class VolcengineTtsClient(
             if (subtitle != null) {
                 subtitles += subtitle
                 subtitleFrameCount++
-            } else if (!hasAudio && frame["code"] !is Number) {
-                Timber
-                    .tag(TTS_LOG_TAG)
-                    .i(
-                        "Parsed SSE non-audio frame without subtitle: event=%s keys=%s sentenceType=%s wordsType=%s",
-                        eventName,
-                        frame.keys.joinToString(separator = "|"),
-                        frame["sentence"]?.javaClass?.simpleName,
-                        frame["words"]?.javaClass?.simpleName,
-                    )
+            } else if (!hasAudio) {
+                frame.logUnparsedTextFrame(source = "sse", frame = eventName)
             }
             if (frame["code"] is Number) {
                 finalStatus = frame
@@ -492,9 +479,16 @@ internal class VolcengineTtsClient(
     private fun Map<*, *>.doubleValue(vararg keys: String): Double? {
         keys.forEach { key ->
             val value = this[key]
-            if (value is Number) return value.toDouble()
+            when (value) {
+                is Number -> return value.toDouble().normalizeTimestampSeconds()
+                is String -> value.toDoubleOrNull()?.let { return it.normalizeTimestampSeconds() }
+            }
         }
         return null
+    }
+
+    private fun Double.normalizeTimestampSeconds(): Double {
+        return if (this > TIMESTAMP_MILLIS_THRESHOLD) this / 1000 else this
     }
 
     private fun createTempCloudSpeechFile(context: Context): File {
@@ -556,6 +550,41 @@ internal class VolcengineTtsClient(
         return replace("\r", "\\r").replace("\n", "\\n")
     }
 
+    private fun Map<*, *>.logUnparsedTextFrame(source: String, frame: String) {
+        if (this["code"] is Number && this["sentence"] !is Map<*, *> && this["words"] !is List<*>) return
+
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Parsed %s text frame without subtitle: frame=%s keys=%s code=%s message=%s sentenceType=%s sentence=%s wordsType=%s words=%s",
+                source,
+                frame,
+                keys.joinToString(separator = "|"),
+                this["code"],
+                this["message"],
+                this["sentence"]?.javaClass?.simpleName,
+                this["sentence"].debugValueForLog(),
+                this["words"]?.javaClass?.simpleName,
+                this["words"].debugValueForLog(),
+            )
+    }
+
+    private fun Any?.debugValueForLog(): String {
+        return when (this) {
+            null -> "null"
+            is String -> escapeForLog()
+            is Map<*, *> -> debugMapForLog()
+            is List<*> -> joinToString(separator = "|", prefix = "[", postfix = "]") { it.debugValueForLog() }
+            else -> toString()
+        }
+    }
+
+    private fun Map<*, *>.debugMapForLog(): String {
+        return entries.joinToString(separator = ",", prefix = "{", postfix = "}") { (key, value) ->
+            "$key=${value.debugValueForLog()}"
+        }
+    }
+
     private fun ByteArray.slicePcmBySeconds(
         startSeconds: Double,
         endSeconds: Double,
@@ -571,6 +600,10 @@ internal class VolcengineTtsClient(
             .coerceIn(start, size)
             .alignPcmOffset()
         return copyOfRange(start, end).trimPcmSilence()
+    }
+
+    private fun ByteArray.pcmDurationSeconds(sampleRate: Int): Double {
+        return size.toDouble() / (sampleRate * PCM_BYTES_PER_SAMPLE)
     }
 
     private fun Int.alignPcmOffset(): Int = this - (this % PCM_BYTES_PER_SAMPLE)
@@ -633,6 +666,7 @@ internal class VolcengineTtsClient(
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
         const val DEBUG_WORDS_RADIUS = 5
         const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
+        const val TIMESTAMP_MILLIS_THRESHOLD = 1000
         const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
         const val MAX_CONCURRENT_TIMED_REQUESTS = 1
 
