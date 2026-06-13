@@ -481,7 +481,7 @@ object PreferenceData {
             enabled = getBoolean(PREF_CLOUD_TTS_ENABLED, false),
             apiKey = getNonNullString(PREF_CLOUD_TTS_API_KEY, ""),
             resourceId = getNonNullString(PREF_CLOUD_TTS_RESOURCE_ID, "seed-tts-2.0"),
-            speaker = getNonNullString(PREF_CLOUD_TTS_SPEAKER, "zh_female_cancan_mars_bigtts"),
+            speaker = getNonNullString(PREF_CLOUD_TTS_SPEAKER, "zh_female_vv_uranus_bigtts"),
             speechRate = getNonNullString(PREF_CLOUD_TTS_SPEECH_RATE, "0").toIntOrNull() ?: 0,
             emotionScale = getNonNullString(PREF_CLOUD_TTS_EMOTION_SCALE, "1").toIntOrNull() ?: 1,
         )

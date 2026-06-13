@@ -144,21 +144,30 @@ internal class VolcengineTtsClient(
     }
 
     private fun startSessionPayload(): String {
+        val reqParams = mutableMapOf<String, Any>(
+            "speaker" to settings.speaker,
+            "audio_params" to mapOf(
+                "format" to "mp3",
+                "sample_rate" to 24000,
+                "bit_rate" to 64000,
+                "speech_rate" to settings.speechRate.coerceIn(-50, 100),
+                "emotion_scale" to settings.emotionScale.coerceIn(1, 5),
+            ),
+        )
+        if (settings.resourceId in RESOURCE_IDS_SUPPORTING_CONTEXT_TEXTS) {
+            reqParams["additions"] = moshiMapAdapter.toJson(
+                mapOf(
+                    "context_texts" to listOf(COUNTDOWN_CONTEXT_TEXT),
+                )
+            )
+        }
+
         return moshiMapAdapter.toJson(
             mapOf(
                 "user" to mapOf("uid" to "timer-machine-android"),
                 "event" to Event.START_SESSION,
                 "namespace" to "BidirectionalTTS",
-                "req_params" to mapOf(
-                    "speaker" to settings.speaker,
-                    "audio_params" to mapOf(
-                        "format" to "mp3",
-                        "sample_rate" to 24000,
-                        "bit_rate" to 64000,
-                        "speech_rate" to settings.speechRate.coerceIn(-50, 100),
-                        "emotion_scale" to settings.emotionScale.coerceIn(1, 5),
-                    ),
-                ),
+                "req_params" to reqParams,
             )
         )
     }
@@ -278,6 +287,12 @@ internal class VolcengineTtsClient(
     private companion object {
         const val URL = "wss://openspeech.bytedance.com/api/v3/tts/bidirection"
         const val SYNTHESIZE_TIMEOUT_MILLIS = 30_000L
+        const val COUNTDOWN_CONTEXT_TEXT = "这是倒计时播报。请保持稳定、中性的语气和节奏，不要加入额外感情。"
+
+        val RESOURCE_IDS_SUPPORTING_CONTEXT_TEXTS = setOf(
+            "seed-tts-2.0",
+            "seed-icl-2.0",
+        )
 
         val EVENTS_WITH_ID = setOf(
             Event.CONNECTION_STARTED,

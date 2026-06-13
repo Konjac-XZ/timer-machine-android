@@ -29,7 +29,7 @@
 
     <EditTextPreference
         app:dependency="pref_cloud_tts_enabled"
-        app:defaultValue="zh_female_cancan_mars_bigtts"
+        app:defaultValue="zh_female_vv_uranus_bigtts"
         app:icon="@drawable/settings_voice"
         app:key="pref_cloud_tts_speaker"
         app:singleLineTitle="false"
