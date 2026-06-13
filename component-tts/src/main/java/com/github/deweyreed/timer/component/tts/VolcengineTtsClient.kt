@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
+import timber.log.Timber
 import xyz.aprildown.timer.app.base.data.PreferenceData.CloudTtsSettings
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -51,25 +52,73 @@ internal class VolcengineTtsClient(
     }
 
     suspend fun synthesizeTimedSpeech(texts: List<String>): List<TimedSpeech> = withContext(Dispatchers.IO) {
+        val requests = texts.map { text ->
+            TimedSpeechRequest(
+                text = text,
+                normalizedText = normalizeSubtitleText(text),
+                synthesisText = asSentenceText(text),
+            )
+        }
+        val synthesisText = requests.joinToString(separator = "\n") { it.synthesisText }
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis start: count=%d first=%s last=%s chars=%d",
+                requests.size,
+                requests.firstOrNull()?.text,
+                requests.lastOrNull()?.text,
+                synthesisText.length,
+            )
         val synthesisResult = synthesize(
-            text = texts.joinToString(separator = "\n") { it.asSentenceText() },
+            text = synthesisText,
             audioFormat = AUDIO_FORMAT_PCM,
             enableSubtitle = true,
         )
-        val subtitles = synthesisResult.subtitles
-        check(subtitles.size >= texts.size) {
-            "Expected at least ${texts.size} subtitle segments, got ${subtitles.size}"
+        val words = synthesisResult.subtitles.flatMap { it.words }
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis response: audioBytes=%d sentences=%d words=%d wordsPreview=%s",
+                synthesisResult.audio.size,
+                synthesisResult.subtitles.size,
+                words.size,
+                words.take(20).joinToString(separator = "|") { it.word },
+            )
+        check(words.size >= texts.size) {
+            "Expected at least ${texts.size} subtitle words, got ${words.size}; " +
+                "sentences=${synthesisResult.subtitles.size}"
         }
 
-        texts.mapIndexed { index, text ->
-            val subtitle = subtitles[index]
+        var wordIndex = 0
+        requests.map { request ->
+            val matchedWords = mutableListOf<SubtitleWord>()
+            var matchedText = ""
+            while (wordIndex < words.size && matchedText != request.normalizedText) {
+                val word = words[wordIndex++]
+                matchedWords += word
+                matchedText += word.normalizedWord
+            }
+            check(matchedWords.isNotEmpty() && matchedText == request.normalizedText) {
+                "Subtitle word mismatch: expected=${request.text}, actual=$matchedText"
+            }
             TimedSpeech(
-                text = text,
+                text = request.text,
                 audio = synthesisResult.audio.slicePcmBySeconds(
-                    startSeconds = subtitle.startSeconds,
-                    endSeconds = subtitle.endSeconds,
+                    startSeconds = matchedWords.first().startTime,
+                    endSeconds = matchedWords.last().endTime,
                     sampleRate = SAMPLE_RATE,
-                ),
+                ).also { slicedAudio ->
+                    Timber
+                        .tag(TTS_LOG_TAG)
+                        .i(
+                            "Timed synthesis slice: text=%s words=%s start=%.3f end=%.3f bytes=%d",
+                            request.text,
+                            matchedWords.joinToString(separator = "|") { it.word },
+                            matchedWords.first().startTime,
+                            matchedWords.last().endTime,
+                            slicedAudio.size,
+                        )
+                },
                 sampleRate = SAMPLE_RATE,
             )
         }
@@ -97,6 +146,15 @@ internal class VolcengineTtsClient(
 
         okHttpClient.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "HTTP synthesis finished: code=%d requestId=%s logId=%s bodyChars=%d",
+                    response.code,
+                    requestId,
+                    response.header("X-Tt-Logid"),
+                    body.length,
+                )
             if (!response.isSuccessful) {
                 error(
                     "Volcengine TTS failed: code=${response.code}, requestId=$requestId, " +
@@ -163,16 +221,24 @@ internal class VolcengineTtsClient(
         val audioOutput = ByteArrayOutputStream()
         val subtitles = mutableListOf<Subtitle>()
         var finalStatus: Map<*, *>? = null
+        var frameCount = 0
+        var audioFrameCount = 0
+        var subtitleFrameCount = 0
         val reader = JsonReader.of(Buffer().writeUtf8(body)).apply {
             isLenient = true
         }
 
         while (reader.peek() != JsonReader.Token.END_DOCUMENT) {
             val frame = reader.readJsonValue() as? Map<*, *> ?: continue
+            frameCount++
             (frame["data"] as? String)?.let { data ->
                 audioOutput.write(Base64.decode(data, Base64.DEFAULT))
+                audioFrameCount++
             }
-            frame.subtitleOrNull()?.let(subtitles::add)
+            frame.subtitleOrNull()?.let { subtitle ->
+                subtitles += subtitle
+                subtitleFrameCount++
+            }
             if (frame["code"] is Number) {
                 finalStatus = frame
             }
@@ -182,6 +248,17 @@ internal class VolcengineTtsClient(
         if (finalCode != null && finalCode != CODE_OK) {
             error("Volcengine TTS failed: $finalStatus")
         }
+
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Parsed synthesis response: frames=%d audioFrames=%d subtitleFrames=%d audioBytes=%d finalStatus=%s",
+                frameCount,
+                audioFrameCount,
+                subtitleFrameCount,
+                audioOutput.size(),
+                finalStatus,
+            )
 
         return SynthesisResult(
             audio = audioOutput.toByteArray(),
@@ -223,11 +300,24 @@ internal class VolcengineTtsClient(
         return File(folder, "${UUID.randomUUID()}.mp3")
     }
 
-    private fun String.asSentenceText(): String {
-        val trimmed = trim()
+    private data class TimedSpeechRequest(
+        val text: String,
+        val normalizedText: String,
+        val synthesisText: String,
+    )
+
+    private fun asSentenceText(text: String): String {
+        val trimmed = text.trim()
         if (trimmed.isEmpty()) return trimmed
         return if (trimmed.last() in SENTENCE_ENDINGS) trimmed else "$trimmed。"
     }
+
+    private fun normalizeSubtitleText(text: String): String {
+        return text.trim().trim(*SENTENCE_ENDINGS_ARRAY)
+    }
+
+    private val SubtitleWord.normalizedWord: String
+        get() = normalizeSubtitleText(word)
 
     private fun ByteArray.slicePcmBySeconds(
         startSeconds: Double,
@@ -293,6 +383,7 @@ internal class VolcengineTtsClient(
 
     private companion object {
         const val HTTP_CHUNKED_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+        const val TTS_LOG_TAG = "VolcengineTtsClient"
         const val CODE_OK = 20_000_000
         const val COUNTDOWN_CONTEXT_TEXT = "这是倒计时播报。请保持稳定、中性的语气和节奏，不要加入额外感情。"
         const val AUDIO_FORMAT_MP3 = "mp3"
@@ -316,6 +407,15 @@ internal class VolcengineTtsClient(
         )
 
         val SENTENCE_ENDINGS = setOf(
+            '。',
+            '！',
+            '？',
+            '.',
+            '!',
+            '?',
+        )
+
+        val SENTENCE_ENDINGS_ARRAY = charArrayOf(
             '。',
             '！',
             '？',

@@ -48,6 +48,7 @@ object TtsBakery {
     private const val COUNTDOWN_PRERENDER_NOTIFICATION_ID = Constants.NOTIF_ID_APP_INFO - 1
     private const val WAV_BITS_PER_SAMPLE = 16
     private const val WAV_CHANNELS = 1
+    private const val TTS_LOG_TAG = "TtsBakery"
 
     private val prerenderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var prerenderJob: Job? = null
@@ -290,9 +291,26 @@ object TtsBakery {
         }
 
         if (pendingTexts.isNotEmpty()) {
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "Cloud batch bake start: total=%d pending=%d cached=%d first=%s last=%s",
+                    texts.size,
+                    pendingTexts.size,
+                    successCount,
+                    pendingTexts.firstOrNull(),
+                    pendingTexts.lastOrNull(),
+                )
             runCatching {
                 cloudTtsClient.synthesizeTimedSpeech(pendingTexts)
             }.onSuccess { timedSpeechList ->
+                Timber
+                    .tag(TTS_LOG_TAG)
+                    .i(
+                        "Cloud batch bake synthesized: pending=%d returned=%d",
+                        pendingTexts.size,
+                        timedSpeechList.size,
+                    )
                 pendingTexts.forEachIndexed { index, text ->
                     runCatching {
                         val timedSpeech = timedSpeechList.getOrNull(index)
@@ -302,6 +320,14 @@ object TtsBakery {
                             pcmAudio = timedSpeech.audio,
                             sampleRate = timedSpeech.sampleRate,
                         )
+                        Timber
+                            .tag(TTS_LOG_TAG)
+                            .i(
+                                "Cloud batch bake cache put: text=%s bytes=%d sampleRate=%d",
+                                text,
+                                timedSpeech.audio.size,
+                                timedSpeech.sampleRate,
+                            )
                         TtsBakeryDiskCache.put(context, text, file)
                     }.onSuccess {
                         successCount++
@@ -315,6 +341,9 @@ object TtsBakery {
                 if (error is CancellationException && error !is TimeoutCancellationException) {
                     throw error
                 }
+                Timber
+                    .tag(TTS_LOG_TAG)
+                    .e(error, "Cloud batch bake failed before cache writes")
                 pendingTexts.forEach { text ->
                     failedCount++
                     Timber.e(error, "Failed to bake cloud TTS text: %s", text)
