@@ -8,6 +8,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.annotation.ColorInt
 import androidx.annotation.VisibleForTesting
 import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
@@ -33,6 +34,7 @@ class EditableStep(
     var length: Long,
     var behaviour: List<BehaviourEntity>,
     val stepType: StepType = StepType.NORMAL,
+    @ColorInt var color: Int? = null,
     private val handler: Handler,
     var isInAGroup: Boolean = false
 ) : AbstractItem<EditableStep.ViewHolder>() {
@@ -41,6 +43,7 @@ class EditableStep(
         data object Length : Event()
         data object Behaviour : Event()
         data object InOutGroup : Event()
+        data object Color : Event()
     }
 
     /**
@@ -51,6 +54,7 @@ class EditableStep(
         fun onStepNameChange(position: Int, newName: String)
         fun onLengthClick(view: View, position: Int)
         fun onAddBtnClick(view: View, position: Int)
+        fun onColorClick(view: View, position: Int)
 
         fun onBehaviourListShow()
         fun showBehaviourSettingsView(
@@ -100,6 +104,13 @@ class EditableStep(
         private var stepNameTextChangeListener: TextWatcher? = null
 
         init {
+            stepColor.setOnClickListener {
+                val position = bindingAdapterPosition
+                if (position != RecyclerView.NO_POSITION) {
+                    handler.onColorClick(it, position)
+                }
+            }
+
             stepName.showActionAndMultiLine(EditorInfo.IME_ACTION_DONE)
 
             length.setOnClickListener {
@@ -158,19 +169,20 @@ class EditableStep(
                             startStepGroupIndicator.isVisible = inAGroup
                             endStepGroupIndicator.isVisible = inAGroup
                         }
+                        is Event.Color -> {
+                            applyColor(item)
+                        }
                     }
                 }
             }
         }
 
         private fun fullBind(item: EditableStep) {
-            val color = item.stepType.getTypeColor(context)
-
             val inAGroup = item.isInAGroup
             startStepGroupIndicator.isVisible = inAGroup
             endStepGroupIndicator.isVisible = inAGroup
 
-            ImageViewCompat.setImageTintList(stepColor, color.toColorStateList())
+            applyColor(item)
 
             stepName.run {
                 stepNameTextChangeListener = object : TextWatcher {
@@ -198,26 +210,33 @@ class EditableStep(
                 setText(item.label)
             }
 
-            length.setBgColor(color)
             length.setTime(item.length)
 
             if (item.stepType == StepType.END) {
                 addBtn.gone()
             } else {
                 addBtn.show()
-                addBtn.imageTintList = ColorStateList.valueOf(color)
                 addBtn.setOnClickListener {
                     handler.onAddBtnClick(it, bindingAdapterPosition)
                 }
             }
 
-            behaviour.setEnabledColor(color)
             behaviour.setBehaviours(item.behaviour)
             behaviour.setBehaviourAddedOrRemovedCallback {
                 val newBehaviours = behaviour.getBehaviours()
                 item.behaviour = newBehaviours
                 handler.onBehaviourAddedOrRemoved(bindingAdapterPosition, newBehaviours)
             }
+        }
+
+        private fun applyColor(item: EditableStep) {
+            val color = item.color ?: item.stepType.getTypeColor(context)
+            ImageViewCompat.setImageTintList(stepColor, color.toColorStateList())
+            length.setBgColor(color)
+            if (item.stepType != StepType.END) {
+                addBtn.imageTintList = ColorStateList.valueOf(color)
+            }
+            behaviour.setEnabledColor(color)
         }
 
         fun unbindView() {

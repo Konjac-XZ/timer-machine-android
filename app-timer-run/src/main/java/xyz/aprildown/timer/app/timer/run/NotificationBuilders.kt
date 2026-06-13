@@ -18,7 +18,7 @@ import androidx.core.app.NotificationCompat.Builder
 import androidx.core.content.edit
 import com.github.deweyreed.tools.helper.pendingActivityIntent
 import com.github.deweyreed.tools.helper.pendingServiceIntent
-import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
+import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.data.PreferenceData.useMediaStyleNotification
 import xyz.aprildown.timer.app.base.ui.AppNavigator
 import xyz.aprildown.timer.app.base.ui.newDynamicTheme
@@ -339,7 +339,7 @@ internal fun Context.buildBehaviourNotification(
         .setLocalOnly(false) // Important for Wear OS
         .setCategory(NotificationCompat.CATEGORY_REMINDER)
         .setPriority(NotificationCompat.PRIORITY_MAX)
-        .setColor(step.type.getTypeColor(this))
+        .setColor(step.resolveColor(this))
         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         .extend(
             NotificationCompat.WearableExtender()

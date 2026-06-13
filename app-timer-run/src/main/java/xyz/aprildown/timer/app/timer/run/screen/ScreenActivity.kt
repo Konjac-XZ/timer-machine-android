@@ -30,7 +30,7 @@ import com.github.deweyreed.tools.helper.toColorStateList
 import com.github.deweyreed.tools.utils.ThemeColorUtils
 import android.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
-import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
+import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.ui.BaseActivity
 import xyz.aprildown.timer.app.base.ui.newDynamicTheme
 import xyz.aprildown.timer.app.base.utils.AppThemeUtils
@@ -180,7 +180,7 @@ class ScreenActivity : BaseActivity() {
     private fun setUpObservers() {
         viewModel.step.observeNonNull(this) { step ->
             currentStepType = step.type
-            val color = step.type.getTypeColor(this)
+            val color = step.resolveColor(this)
             currentStepColor = color
             currentStepColorIsLight = ThemeColorUtils.isLightColor(color)
             val isLightColor = currentStepColorIsLight

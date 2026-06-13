@@ -15,7 +15,6 @@ import com.github.deweyreed.tools.helper.gone
 import com.github.deweyreed.tools.helper.show
 import com.github.deweyreed.tools.helper.toColorStateList
 import com.google.android.material.card.MaterialCardView
-import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
 import xyz.aprildown.timer.app.base.utils.setTime
 import xyz.aprildown.timer.app.intro.Instruction
 import xyz.aprildown.timer.app.intro.InstructionView
@@ -27,6 +26,7 @@ import xyz.aprildown.timer.component.key.RoundTextView
 import xyz.aprildown.timer.component.key.behaviour.EditableBehaviourLayout
 import xyz.aprildown.timer.domain.entities.BehaviourEntity
 import xyz.aprildown.timer.domain.entities.StepEntity
+import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.R as RBase
 import xyz.aprildown.timer.app.timer.edit.R as RTimerEdit
 
@@ -180,7 +180,7 @@ internal class IntroEditableStep(
     }
 
     fun withStepEntity(entity: StepEntity.Step) {
-        val color = entity.type.getTypeColor(context)
+        val color = entity.resolveColor(context)
 
         ImageViewCompat.setImageTintList(stepColorView, color.toColorStateList())
         nameEditText.setText(entity.label)

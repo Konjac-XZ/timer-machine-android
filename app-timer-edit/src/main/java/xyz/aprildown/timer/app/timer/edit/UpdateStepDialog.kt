@@ -4,12 +4,18 @@ import android.app.Dialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
+import androidx.annotation.ColorInt
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.net.toUri
 import androidx.core.widget.ImageViewCompat
 import androidx.fragment.app.DialogFragment
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.color.ColorPalette
+import com.afollestad.materialdialogs.color.colorChooser
+import com.afollestad.materialdialogs.lifecycle.lifecycleOwner
 import com.github.deweyreed.tools.anko.toast
 import com.github.deweyreed.tools.helper.gone
 import com.github.deweyreed.tools.helper.toColorStateList
@@ -28,6 +34,7 @@ import xyz.aprildown.timer.domain.entities.BehaviourEntity
 import xyz.aprildown.timer.domain.entities.BehaviourType
 import xyz.aprildown.timer.domain.entities.ImageAction
 import xyz.aprildown.timer.domain.entities.StepEntity
+import xyz.aprildown.timer.domain.entities.StepType
 import xyz.aprildown.timer.domain.entities.toBeepAction
 import xyz.aprildown.timer.domain.entities.toCountAction
 import xyz.aprildown.timer.domain.entities.toHalfAction
@@ -58,6 +65,8 @@ class UpdateStepDialog :
     private lateinit var binding: ItemEditStepBinding
 
     private var length = 0L
+    @ColorInt
+    private var selectedColor: Int? = null
 
     var step: StepEntity.Step? = null
     var onUpdate: ((StepEntity.Step) -> Unit)? = null
@@ -94,6 +103,7 @@ class UpdateStepDialog :
             dismiss()
             return super.onCreateDialog(savedInstanceState)
         }
+        selectedColor = step.color
         binding.setUpUpdateStepView(step)
         return MaterialAlertDialogBuilder(context)
             .setCancelable(false)
@@ -106,6 +116,7 @@ class UpdateStepDialog :
                         length = length,
                         behaviour = binding.layoutBehaviour.getBehaviours(),
                         type = step.type,
+                        color = resolveCurrentColor()
                     )
                 )
             }
@@ -115,17 +126,20 @@ class UpdateStepDialog :
 
     private fun ItemEditStepBinding.setUpUpdateStepView(step: StepEntity.Step) {
         val context = root.context
+        selectedColor = step.color
 
         cardEditStep.cardElevation = 0f
 
-        val color = step.type.getTypeColor(context)
-        ImageViewCompat.setImageTintList(colorStep, color.toColorStateList())
         viewStepGroupIndicatorStart.gone()
         viewStepGroupIndicatorEnd.gone()
 
         editStepName.setText(step.label)
+        colorStep.setOnClickListener { showColorMenu(it) }
 
-        textStepLength.setBgColor(color)
+        refreshColor()
+
+        layoutBehaviour.setBehaviours(step.behaviour)
+        layoutBehaviour.setListener(this@UpdateStepDialog)
 
         updateLength(step.length)
         textStepLength.setOnClickListener {
@@ -135,10 +149,67 @@ class UpdateStepDialog :
         }
 
         btnStepAdd.gone()
+    }
 
-        layoutBehaviour.setEnabledColor(color)
-        layoutBehaviour.setBehaviours(step.behaviour)
-        layoutBehaviour.setListener(this@UpdateStepDialog)
+    private fun showColorMenu(anchor: View) {
+        popupMenu {
+            dropdownGravity = Gravity.START or Gravity.TOP
+            section {
+                item {
+                    label = getString(RBase.string.edit_step_color_pick)
+                    callback = { showColorChooser() }
+                }
+                item {
+                    val canResetColor = selectedColor != null
+                    label = getString(RBase.string.edit_step_color_reset)
+                    viewBoundCallback = { it.isEnabled = canResetColor }
+                    callback = {
+                        if (canResetColor) {
+                            selectedColor = null
+                            refreshColor()
+                        }
+                    }
+                }
+            }
+        }.show(anchor.context, anchor)
+    }
+
+    private fun showColorChooser() {
+        MaterialDialog(requireContext()).show {
+            lifecycleOwner(this@UpdateStepDialog)
+            title(res = RBase.string.edit_step_color_dialog_title)
+            colorChooser(
+                colors = ColorPalette.Primary,
+                subColors = ColorPalette.PrimarySub,
+                initialSelection = resolveCurrentColor(),
+                waitForPositiveButton = false,
+                allowCustomArgb = true,
+                showAlphaSelector = false,
+            ) { _, color ->
+                selectedColor = color
+                refreshColor()
+            }
+            positiveButton(android.R.string.ok)
+            negativeButton(android.R.string.cancel)
+        }
+    }
+
+    private fun refreshColor() {
+        val color = resolveCurrentColor()
+        ImageViewCompat.setImageTintList(binding.colorStep, color.toColorStateList())
+        binding.textStepLength.setBgColor(color)
+        binding.layoutBehaviour.setEnabledColor(color)
+    }
+
+    @ColorInt
+    private fun resolveCurrentColor(): Int {
+        val currentStep = step
+        val override = selectedColor
+        return if (currentStep != null) {
+            override ?: currentStep.type.getTypeColor(requireContext())
+        } else {
+            override ?: StepType.NORMAL.getTypeColor(requireContext())
+        }
     }
 
     private fun updateLength(length: Long) {

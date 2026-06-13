@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.github.deweyreed.tools.helper.onLongClick
 import com.github.deweyreed.tools.helper.toColorStateList
 import com.mikepenz.fastadapter.items.AbstractItem
-import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
+import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.utils.produceTime
 import xyz.aprildown.timer.app.timer.one.R
 import xyz.aprildown.timer.app.timer.one.databinding.ItemStepStepBinding
@@ -89,7 +89,7 @@ internal class VisibleStep(
                 binding.layoutBehaviour.isVisible = false
             }
 
-            val typeColor = step.type.getTypeColor(context)
+            val typeColor = step.resolveColor(context)
             ImageViewCompat.setImageTintList(
                 binding.imageIndicatorBg,
                 typeColor.toColorStateList()

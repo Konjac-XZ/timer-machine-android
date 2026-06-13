@@ -17,4 +17,7 @@ dependencies {
     implementation(libs.materialPopupMenu)
     implementation(libs.ultimateRingtonePicker)
     implementation(libs.twoWayNestedScrollView)
+    implementation(libs.materialDialog.core)
+    implementation(libs.materialDialog.color)
+    implementation(libs.materialDialog.lifecycle)
 }

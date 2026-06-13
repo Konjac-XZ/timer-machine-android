@@ -21,7 +21,10 @@ import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.afollestad.materialdialogs.color.ColorChooserDialog
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.color.ColorPalette
+import com.afollestad.materialdialogs.color.colorChooser
+import com.afollestad.materialdialogs.lifecycle.lifecycleOwner
 import com.github.deweyreed.tools.anko.dp
 import com.github.deweyreed.tools.helper.color
 import com.github.deweyreed.tools.helper.toColorStateList
@@ -55,7 +58,6 @@ import xyz.aprildown.timer.component.key.R as RComponentKey
 class ThemeFragment :
     Fragment(),
     StepColor.Callback,
-    ColorChooserDialog.ColorCallback,
     CustomThemeDialog.Callback {
 
     @Inject
@@ -279,28 +281,38 @@ class ThemeFragment :
     }
 
     override fun onStepColorClick(pos: Int, type: StepType) {
-        val context = requireContext()
-        ColorChooserDialog.Builder(context, RBase.string.theme_step_color_dialog_title)
-            .tag(pos.toString())
-            .doneButton(android.R.string.ok)
-            .cancelButton(android.R.string.cancel)
-            .customButton(RBase.string.theme_pick_colors)
-            .presetsButton(RBase.string.theme_pick_presets)
-            .backButton(RBase.string.theme_pick_back)
-            .allowUserColorInputAlpha(false)
-            .show(childFragmentManager)
+        showStepColorChooser(
+            position = pos,
+            initialColor = type.getTypeColor(requireContext()),
+        )
     }
 
-    override fun onColorChooserDismissed(dialog: ColorChooserDialog) = Unit
-    override fun onColorSelection(dialog: ColorChooserDialog, selectedColor: Int) {
-        val adapter = (view as? RecyclerView)?.adapter as? FastAdapter<*> ?: return
-        val pos = dialog.tag()?.toIntOrNull() ?: return
-        if (pos in 0 until adapter.itemCount) {
-            val item = adapter.getItem(pos) as? StepColor ?: return
-            item.stepType.saveTypeColor(requireContext(), selectedColor)
-            item.color = selectedColor
-            adapter.notifyItemChanged(pos)
+    private fun showStepColorChooser(position: Int, @ColorInt initialColor: Int) {
+        MaterialDialog(requireContext()).show {
+            lifecycleOwner(viewLifecycleOwner)
+            title(res = RBase.string.theme_step_color_dialog_title)
+            colorChooser(
+                colors = ColorPalette.Primary,
+                subColors = ColorPalette.PrimarySub,
+                initialSelection = initialColor,
+                waitForPositiveButton = false,
+                allowCustomArgb = true,
+                showAlphaSelector = false,
+            ) { _, color ->
+                updateStepColor(position, color)
+            }
+            positiveButton(android.R.string.ok)
+            negativeButton(android.R.string.cancel)
         }
+    }
+
+    private fun updateStepColor(position: Int, @ColorInt selectedColor: Int) {
+        val adapter = (view as? RecyclerView)?.adapter as? FastAdapter<*> ?: return
+        if (position !in 0 until adapter.itemCount) return
+        val item = adapter.getItem(position) as? StepColor ?: return
+        item.stepType.saveTypeColor(requireContext(), selectedColor)
+        item.color = selectedColor
+        adapter.notifyItemChanged(position)
     }
 
     private fun reload() {

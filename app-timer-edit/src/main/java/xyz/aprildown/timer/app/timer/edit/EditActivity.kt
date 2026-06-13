@@ -16,6 +16,7 @@ import androidx.activity.result.ActivityResultCallback
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.ColorInt
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
@@ -38,6 +39,10 @@ import com.github.deweyreed.tools.helper.IntentHelper
 import com.github.deweyreed.tools.helper.gone
 import com.github.deweyreed.tools.helper.show
 import com.github.deweyreed.tools.helper.startActivityOrNothing
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.color.ColorPalette
+import com.afollestad.materialdialogs.color.colorChooser
+import com.afollestad.materialdialogs.lifecycle.lifecycleOwner
 import com.github.zawadz88.materialpopupmenu.popupMenu
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.mikepenz.fastadapter.FastAdapter
@@ -46,6 +51,7 @@ import com.mikepenz.fastadapter.IItem
 import com.mikepenz.fastadapter.adapters.ItemAdapter
 import com.mikepenz.fastadapter.listeners.CustomEventHook
 import dagger.hilt.android.AndroidEntryPoint
+import xyz.aprildown.timer.app.base.data.PreferenceData.getTypeColor
 import xyz.aprildown.timer.app.base.data.PreferenceData.showTimerTotalTime
 import xyz.aprildown.timer.app.base.ui.AppNavigator
 import xyz.aprildown.timer.app.base.ui.BaseActivity
@@ -475,6 +481,7 @@ class EditActivity :
                                     length = currentStep.length,
                                     behaviour = currentStep.behaviour,
                                     stepType = currentStep.type,
+                                    color = currentStep.color,
                                     handler = this@EditActivity,
                                     isInAGroup = editableStep.isInAGroup
                                 )
@@ -568,6 +575,7 @@ class EditActivity :
                                             length = currentStep.length,
                                             behaviour = currentStep.behaviour,
                                             stepType = currentStep.type,
+                                            color = currentStep.color,
                                             handler = this@EditActivity,
                                             isInAGroup = editableStep.isInAGroup
                                         )
@@ -837,6 +845,63 @@ class EditActivity :
                 }
             }
         }.show(this, view)
+    }
+
+    override fun onColorClick(view: View, position: Int) {
+        hideKeyboard()
+
+        val editableStep = fastAdapter.getItem(position) as? EditableStep ?: return
+        popupMenu {
+            dropdownGravity = Gravity.START or Gravity.TOP
+            section {
+                item {
+                    label = getString(RBase.string.edit_step_color_pick)
+                    callback = {
+                        showStepColorChooser(position)
+                    }
+                }
+                item {
+                    val canResetColor = editableStep.color != null
+                    label = getString(RBase.string.edit_step_color_reset)
+                    viewBoundCallback = { it.isEnabled = canResetColor }
+                    callback = {
+                        if (canResetColor) {
+                            updateStepColor(position, null)
+                        }
+                    }
+                }
+            }
+        }.show(this, view)
+    }
+
+    private fun showStepColorChooser(position: Int) {
+        val step = getStepFromFastAdapter(position)
+        val initialColor = step.color ?: step.stepType.getTypeColor(this)
+        MaterialDialog(this).show {
+            lifecycleOwner(this@EditActivity)
+            title(res = RBase.string.edit_step_color_dialog_title)
+            colorChooser(
+                colors = ColorPalette.Primary,
+                subColors = ColorPalette.PrimarySub,
+                initialSelection = initialColor,
+                waitForPositiveButton = false,
+                allowCustomArgb = true,
+                showAlphaSelector = false,
+            ) { _, color ->
+                updateStepColor(position, color)
+            }
+            positiveButton(android.R.string.ok)
+            negativeButton(android.R.string.cancel)
+        }
+    }
+
+    private fun updateStepColor(position: Int, @ColorInt color: Int?) {
+        val item = getStepFromFastAdapter(position)
+        item.color = color
+        if (item.stepType == StepType.NOTIFIER) {
+            viewModel.notifier = viewModel.notifier.copy(color = color)
+        }
+        fastAdapter.notifyAdapterItemChanged(position, EditableStep.Event.Color)
     }
 
     private fun getRingtonePickerResultCallback(): ActivityResultCallback<ActivityResult> {
@@ -1111,6 +1176,7 @@ class EditActivity :
             length = length,
             behaviour = behaviour,
             stepType = type,
+            color = color,
             handler = this@EditActivity,
             isInAGroup = isInAGroup
         )
@@ -1152,11 +1218,13 @@ class EditActivity :
     }
 
     private fun EditableStep.toStep(): StepEntity.Step {
+        val resolvedColor = color ?: stepType.getTypeColor(this@EditActivity)
         return StepEntity.Step(
             label = label,
             length = length,
             behaviour = behaviour,
-            type = stepType
+            type = stepType,
+            color = resolvedColor
         )
     }
 
@@ -1226,7 +1294,15 @@ class EditActivity :
 
     // Every notifier should be independent.
     private fun getNotifierCopy(isInAGroup: Boolean): EditableStep = with(viewModel.notifier) {
-        EditableStep(label, length, behaviour, type, this@EditActivity, isInAGroup)
+        EditableStep(
+            label = label,
+            length = length,
+            behaviour = behaviour,
+            stepType = type,
+            color = color,
+            handler = this@EditActivity,
+            isInAGroup = isInAGroup
+        )
     }
 
     private fun saveTimer() {

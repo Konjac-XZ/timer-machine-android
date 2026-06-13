@@ -10,14 +10,17 @@ import androidx.annotation.ColorInt
 import androidx.annotation.StringRes
 import androidx.core.os.bundleOf
 import androidx.fragment.app.DialogFragment
-import com.afollestad.materialdialogs.color.ColorChooserDialog
+import com.afollestad.materialdialogs.MaterialDialog
+import com.afollestad.materialdialogs.color.ColorPalette
+import com.afollestad.materialdialogs.color.colorChooser
+import com.afollestad.materialdialogs.lifecycle.lifecycleOwner
 import com.github.deweyreed.tools.helper.requireCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import xyz.aprildown.timer.app.settings.R
 import xyz.aprildown.timer.component.key.ListItemWithLayout
 import xyz.aprildown.timer.app.base.R as RBase
 
-internal class CustomThemeDialog : DialogFragment(), ColorChooserDialog.ColorCallback {
+internal class CustomThemeDialog : DialogFragment() {
 
     interface Callback {
         fun onCustomThemePick(@ColorInt primary: Int, @ColorInt secondary: Int)
@@ -59,48 +62,51 @@ internal class CustomThemeDialog : DialogFragment(), ColorChooserDialog.ColorCal
             .create()
 
         fun showChooser(@StringRes title: Int, tag: String, tintButtons: Boolean) {
-            ColorChooserDialog.Builder(context, title)
-                .tag(tag)
-                .doneButton(android.R.string.ok)
-                .cancelButton(android.R.string.cancel)
-                .customButton(RBase.string.theme_pick_colors)
-                .presetsButton(RBase.string.theme_pick_presets)
-                .backButton(RBase.string.theme_pick_back)
-                .allowUserColorInputAlpha(false)
-                .dynamicButtonColor(tintButtons)
-                .show(childFragmentManager)
+            val isPrimary = tag == TAG_PRIMARY
+            MaterialDialog(context).show {
+                lifecycleOwner(this@CustomThemeDialog)
+                title(res = title)
+                colorChooser(
+                    colors = ColorPalette.Primary,
+                    subColors = ColorPalette.PrimarySub,
+                    initialSelection = if (isPrimary) colorPrimary else colorSecondary,
+                    waitForPositiveButton = false,
+                    allowCustomArgb = true,
+                    showAlphaSelector = false,
+                    changeActionButtonsColor = tintButtons,
+                ) { _, color ->
+                    val previous = if (isPrimary) colorPrimary else colorSecondary
+                    if (isPrimary) {
+                        colorPrimary = color
+                        animateColorChange(imagePrimary, previous, color)
+                    } else {
+                        colorSecondary = color
+                        animateColorChange(imageSecondary, previous, color)
+                    }
+                }
+                positiveButton(android.R.string.ok)
+                negativeButton(android.R.string.cancel)
+            }
         }
 
         val itemPrimary = view.findViewById<ListItemWithLayout>(R.id.itemCustomThemePrimary)
         imagePrimary = itemPrimary.getLayoutView()
         imagePrimary.setBackgroundColor(colorPrimary)
         itemPrimary.setOnClickListener {
-            showChooser(RBase.string.theme_custom_primary, "p", tintButtons = false)
+            showChooser(RBase.string.theme_custom_primary, TAG_PRIMARY, tintButtons = false)
         }
 
         val itemSecondary = view.findViewById<ListItemWithLayout>(R.id.itemCustomThemeSecondary)
         imageSecondary = itemSecondary.getLayoutView()
         imageSecondary.setBackgroundColor(colorSecondary)
         itemSecondary.setOnClickListener {
-            showChooser(RBase.string.theme_custom_secondary, "a", tintButtons = true)
+            showChooser(RBase.string.theme_custom_secondary, TAG_SECONDARY, tintButtons = true)
         }
 
         return dialog
     }
 
-    override fun onColorChooserDismissed(dialog: ColorChooserDialog) = Unit
-    override fun onColorSelection(dialog: ColorChooserDialog, selectedColor: Int) {
-        val colorFrom: Int
-        val targetImageView: ImageView
-        if (dialog.tag() == "p") {
-            colorFrom = colorPrimary
-            colorPrimary = selectedColor
-            targetImageView = imagePrimary
-        } else {
-            colorFrom = colorSecondary
-            colorSecondary = selectedColor
-            targetImageView = imageSecondary
-        }
+    private fun animateColorChange(targetImageView: ImageView, @ColorInt colorFrom: Int, @ColorInt selectedColor: Int) {
         targetImageView.post {
             ValueAnimator.ofArgb(colorFrom, selectedColor)
                 .apply {
@@ -117,6 +123,8 @@ internal class CustomThemeDialog : DialogFragment(), ColorChooserDialog.ColorCal
     companion object {
         private const val ARG_PRIMARY = "primary"
         private const val ARG_SECONDARY = "secondary"
+        private const val TAG_PRIMARY = "p"
+        private const val TAG_SECONDARY = "a"
 
         fun newInstance(@ColorInt primary: Int, @ColorInt secondary: Int): CustomThemeDialog =
             CustomThemeDialog().apply {

@@ -23,6 +23,7 @@ import xyz.aprildown.timer.app.base.data.PreferenceData.AppTheme.AppThemeType.Co
 import xyz.aprildown.timer.app.base.data.PreferenceData.AppTheme.AppThemeType.Companion.TYPE_DYNAMIC_LIGHT
 import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.produceTime
+import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.domain.entities.StepType
 import xyz.aprildown.timer.domain.utils.AppConfig
 import xyz.aprildown.tools.helper.safeSharedPreference
@@ -417,6 +418,8 @@ object PreferenceData {
             )
         }
     }
+
+    fun StepEntity.Step.resolveColor(context: Context): Int = color ?: type.getTypeColor(context)
 
     // endregion StepColor
 

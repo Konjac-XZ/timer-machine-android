@@ -101,6 +101,9 @@
     <string name="edit_group_end">Group End</string>
     <string name="edit_delete_group">Delete group</string>
     <string name="edit_step">Edit Step</string>
+    <string name="edit_step_color_pick">Change color</string>
+    <string name="edit_step_color_reset">Use default color</string>
+    <string name="edit_step_color_dialog_title">Step color</string>
     <string name="edit_add_step">Add a new step</string>
     <string name="edit_add_normal">Normal</string>
     <string name="edit_add_normal_desp">Add a normal step</string>

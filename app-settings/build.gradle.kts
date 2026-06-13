@@ -18,7 +18,8 @@ dependencies {
     implementation(libs.fastAdapter.core)
 
     implementation(libs.materialDialog.core)
-    implementation(libs.materialDialog.common)
+    implementation(libs.materialDialog.color)
+    implementation(libs.materialDialog.lifecycle)
     implementation(libs.permission)
 
 }

@@ -140,8 +140,9 @@ fastAdapter-core = "com.mikepenz:fastadapter:5.7.0"
 fastAdapter-binding = "com.mikepenz:fastadapter-extensions-binding:5.7.0"
 fastAdapter-expandable = "com.mikepenz:fastadapter-extensions-expandable:5.7.0"
 
-materialDialog-core = "com.afollestad.material-dialogs:core:0.9.6.0"
-materialDialog-common = "com.afollestad.material-dialogs:commons:0.9.6.0"
+materialDialog-core = "com.afollestad.material-dialogs:core:3.3.0"
+materialDialog-color = "com.afollestad.material-dialogs:color:3.3.0"
+materialDialog-lifecycle = "com.afollestad.material-dialogs:lifecycle:3.3.0"
 
 calendarView = "com.github.kizitonwose:CalendarView:1.0.4"
 chart = "com.github.PhilJay:MPAndroidChart:v3.1.0"

@@ -1,5 +1,6 @@
 package xyz.aprildown.timer.data.datas
 
+import androidx.annotation.ColorInt
 import androidx.annotation.Keep
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -21,7 +22,10 @@ internal sealed class StepData {
         val behaviour: List<BehaviourData> = emptyList(),
 
         @Json(name = "type")
-        val type: StepType = StepType.NORMAL
+        val type: StepType = StepType.NORMAL,
+
+        @Json(name = "color")
+        @ColorInt val color: Int? = null
     ) : StepData()
 
     @Keep
