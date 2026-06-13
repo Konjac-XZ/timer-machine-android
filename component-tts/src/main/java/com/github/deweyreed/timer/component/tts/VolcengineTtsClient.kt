@@ -1,6 +1,7 @@
 package com.github.deweyreed.timer.component.tts
 
 import android.content.Context
+import android.media.MediaPlayer
 import android.util.Base64
 import com.squareup.moshi.JsonReader
 import com.squareup.moshi.Moshi
@@ -20,7 +21,11 @@ import timber.log.Timber
 import xyz.aprildown.timer.app.base.data.PreferenceData.CloudTtsSettings
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
@@ -55,7 +60,10 @@ internal class VolcengineTtsClient(
         }
     }
 
-    suspend fun synthesizeTimedSpeech(texts: List<String>): List<TimedSpeech> = withContext(Dispatchers.IO) {
+    suspend fun synthesizeTimedSpeech(
+        texts: List<String>,
+        debugPlaybackContext: Context? = null,
+    ): List<TimedSpeech> = withContext(Dispatchers.IO) {
         val requests = texts.map { text ->
             TimedSpeechRequest(
                 text = text,
@@ -83,6 +91,7 @@ internal class VolcengineTtsClient(
                             requests = batchRequests,
                             batchIndex = batchIndex,
                             batchCount = batches.size,
+                            debugPlaybackContext = debugPlaybackContext,
                         )
                     }
                 }
@@ -95,6 +104,7 @@ internal class VolcengineTtsClient(
         requests: List<TimedSpeechRequest>,
         batchIndex: Int,
         batchCount: Int,
+        debugPlaybackContext: Context?,
     ): List<TimedSpeech> {
         val synthesisText = requests.joinToString(separator = "\n") { it.synthesisText }
         Timber
@@ -114,6 +124,12 @@ internal class VolcengineTtsClient(
             text = synthesisText,
             audioFormat = AUDIO_FORMAT_PCM,
             enableSubtitle = true,
+        )
+        debugPlaybackContext?.playDebugTimedBatch(
+            batchIndex = batchIndex,
+            batchCount = batchCount,
+            requests = requests,
+            audio = synthesisResult.audio,
         )
         val words = synthesisResult.subtitles.flatMap { it.words }
         Timber
@@ -497,6 +513,98 @@ internal class VolcengineTtsClient(
         return File(folder, "${UUID.randomUUID()}.mp3")
     }
 
+    private fun Context.playDebugTimedBatch(
+        batchIndex: Int,
+        batchCount: Int,
+        requests: List<TimedSpeechRequest>,
+        audio: ByteArray,
+    ) {
+        val folder = File(cacheDir, "tts-cloud-playback")
+        folder.mkdirs()
+        val file = File(
+            folder,
+            "timed-batch-${batchIndex + 1}-of-$batchCount-${UUID.randomUUID()}.wav"
+        )
+        file.writePcmWav(
+            pcmAudio = audio,
+            sampleRate = SAMPLE_RATE,
+        )
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis debug playback start: batch=%d/%d texts=%s audioBytes=%d duration=%.3f file=%s",
+                batchIndex + 1,
+                batchCount,
+                requests.joinToString(separator = "|") { it.text },
+                audio.size,
+                audio.pcmDurationSeconds(sampleRate = SAMPLE_RATE),
+                file.absolutePath,
+            )
+        val done = CountDownLatch(1)
+        var player: MediaPlayer? = null
+        try {
+            player = MediaPlayer().apply {
+                setDataSource(file.absolutePath)
+                setOnCompletionListener {
+                    done.countDown()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Timber
+                        .tag(TTS_LOG_TAG)
+                        .w(
+                            "Timed synthesis debug playback error: batch=%d/%d what=%d extra=%d",
+                            batchIndex + 1,
+                            batchCount,
+                            what,
+                            extra,
+                        )
+                    done.countDown()
+                    true
+                }
+                prepare()
+                start()
+            }
+            done.await()
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "Timed synthesis debug playback finished: batch=%d/%d",
+                    batchIndex + 1,
+                    batchCount,
+                )
+        } finally {
+            player?.release()
+            file.delete()
+        }
+    }
+
+    private fun File.writePcmWav(
+        pcmAudio: ByteArray,
+        sampleRate: Int,
+    ) {
+        FileOutputStream(this).use { output ->
+            output.write(
+                ByteBuffer.allocate(WAV_HEADER_BYTES)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .put("RIFF".encodeToByteArray())
+                    .putInt(WAV_HEADER_BYTES - 8 + pcmAudio.size)
+                    .put("WAVE".encodeToByteArray())
+                    .put("fmt ".encodeToByteArray())
+                    .putInt(16)
+                    .putShort(1)
+                    .putShort(WAV_CHANNELS.toShort())
+                    .putInt(sampleRate)
+                    .putInt(sampleRate * WAV_CHANNELS * WAV_BITS_PER_SAMPLE / 8)
+                    .putShort((WAV_CHANNELS * WAV_BITS_PER_SAMPLE / 8).toShort())
+                    .putShort(WAV_BITS_PER_SAMPLE.toShort())
+                    .put("data".encodeToByteArray())
+                    .putInt(pcmAudio.size)
+                    .array()
+            )
+            output.write(pcmAudio)
+        }
+    }
+
     private data class TimedSpeechRequest(
         val text: String,
         val normalizedText: String,
@@ -661,6 +769,9 @@ internal class VolcengineTtsClient(
         const val AUDIO_FORMAT_PCM = "pcm"
         const val SAMPLE_RATE = 24000
         const val PCM_BYTES_PER_SAMPLE = 2
+        const val WAV_HEADER_BYTES = 44
+        const val WAV_BITS_PER_SAMPLE = 16
+        const val WAV_CHANNELS = 1
         const val SILENCE_THRESHOLD = 256
         const val TRIM_PADDING_MILLIS = 20
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000

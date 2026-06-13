@@ -332,7 +332,10 @@ object TtsBakery {
                     pendingTexts.joinToString(separator = "|"),
                 )
             runCatching {
-                cloudTtsClient.synthesizeTimedSpeech(pendingTexts)
+                cloudTtsClient.synthesizeTimedSpeech(
+                    texts = pendingTexts,
+                    debugPlaybackContext = context,
+                )
             }.onSuccess { timedSpeechList ->
                 val timedSpeechByText = timedSpeechList.associateBy { it.text }
                 val returnedTexts = timedSpeechByText.keys
