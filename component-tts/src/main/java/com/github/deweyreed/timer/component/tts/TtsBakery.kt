@@ -22,16 +22,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import xyz.aprildown.timer.app.base.R
@@ -40,16 +35,19 @@ import xyz.aprildown.timer.app.base.data.PreferenceData.cloudTtsSettings
 import xyz.aprildown.timer.app.base.utils.ChineseNumberUtils
 import xyz.aprildown.tools.helper.safeSharedPreference
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object TtsBakery {
     private const val SYNTHESIZE_TIMEOUT_MILLIS = 20_000L
-    private const val CLOUD_TTS_PRERENDER_CONCURRENCY = 8
     private const val COUNTDOWN_PRERENDER_NOTIFICATION_ID = Constants.NOTIF_ID_APP_INFO - 1
+    private const val WAV_BITS_PER_SAMPLE = 16
+    private const val WAV_CHANNELS = 1
 
     private val prerenderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var prerenderJob: Job? = null
@@ -277,40 +275,58 @@ object TtsBakery {
         texts: List<String>,
         cloudTtsClient: VolcengineTtsClient,
         onProgress: ((current: Int, total: Int) -> Unit)?,
-    ): BatchBakeResult = coroutineScope {
-        val semaphore = Semaphore(CLOUD_TTS_PRERENDER_CONCURRENCY)
-        val completedCount = AtomicInteger(0)
-        val successCount = AtomicInteger(0)
-        val failedCount = AtomicInteger(0)
+    ): BatchBakeResult {
+        var successCount = 0
+        var failedCount = 0
+        val pendingTexts = mutableListOf<String>()
 
-        texts.map { text ->
-            async(Dispatchers.IO) {
-                semaphore.withPermit {
-                    if (text.isBlank() || TtsBakeryDiskCache.get(context, text) != null) {
-                        successCount.incrementAndGet()
-                    } else {
-                        runCatching {
-                            val file = cloudTtsClient.synthesizeToFile(context, text)
-                            TtsBakeryDiskCache.put(context, text, file)
-                        }.onSuccess {
-                            successCount.incrementAndGet()
-                        }.onFailure { error ->
-                            if (error is CancellationException && error !is TimeoutCancellationException) {
-                                throw error
-                            }
-                            failedCount.incrementAndGet()
-                            Timber.e(error, "Failed to bake cloud TTS text: %s", text)
-                        }
+        texts.forEach { text ->
+            if (text.isBlank() || TtsBakeryDiskCache.get(context, text) != null) {
+                successCount++
+                onProgress?.invoke(successCount + failedCount, texts.size)
+            } else {
+                pendingTexts += text
+            }
+        }
+
+        if (pendingTexts.isNotEmpty()) {
+            runCatching {
+                cloudTtsClient.synthesizeTimedSpeech(pendingTexts)
+            }.onSuccess { timedSpeechList ->
+                pendingTexts.forEachIndexed { index, text ->
+                    runCatching {
+                        val timedSpeech = timedSpeechList.getOrNull(index)
+                            ?: error("Missing synthesized audio for $text")
+                        val file = createTempSpeechFile(context)
+                        file.writeWav(
+                            pcmAudio = timedSpeech.audio,
+                            sampleRate = timedSpeech.sampleRate,
+                        )
+                        TtsBakeryDiskCache.put(context, text, file)
+                    }.onSuccess {
+                        successCount++
+                    }.onFailure { error ->
+                        failedCount++
+                        Timber.e(error, "Failed to cache cloud TTS text: %s", text)
                     }
-                    onProgress?.invoke(completedCount.incrementAndGet(), texts.size)
+                    onProgress?.invoke(successCount + failedCount, texts.size)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException && error !is TimeoutCancellationException) {
+                    throw error
+                }
+                pendingTexts.forEach { text ->
+                    failedCount++
+                    Timber.e(error, "Failed to bake cloud TTS text: %s", text)
+                    onProgress?.invoke(successCount + failedCount, texts.size)
                 }
             }
-        }.awaitAll()
+        }
 
-        BatchBakeResult(
+        return BatchBakeResult(
             total = texts.size,
-            success = successCount.get(),
-            failed = failedCount.get(),
+            success = successCount,
+            failed = failedCount,
         )
     }
 
@@ -342,6 +358,33 @@ object TtsBakery {
         val folder = File(context.cacheDir, "tts-bakery-temp")
         folder.mkdirs()
         return File(folder, UUID.randomUUID().toString())
+    }
+
+    private fun File.writeWav(
+        pcmAudio: ByteArray,
+        sampleRate: Int,
+    ) {
+        FileOutputStream(this).use { output ->
+            output.write(
+                ByteBuffer.allocate(44)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .put("RIFF".encodeToByteArray())
+                    .putInt(36 + pcmAudio.size)
+                    .put("WAVE".encodeToByteArray())
+                    .put("fmt ".encodeToByteArray())
+                    .putInt(16)
+                    .putShort(1)
+                    .putShort(WAV_CHANNELS.toShort())
+                    .putInt(sampleRate)
+                    .putInt(sampleRate * WAV_CHANNELS * WAV_BITS_PER_SAMPLE / 8)
+                    .putShort((WAV_CHANNELS * WAV_BITS_PER_SAMPLE / 8).toShort())
+                    .putShort(WAV_BITS_PER_SAMPLE.toShort())
+                    .put("data".encodeToByteArray())
+                    .putInt(pcmAudio.size)
+                    .array()
+            )
+            output.write(pcmAudio)
+        }
     }
 
     private suspend fun synthesizeToFile(tts: TextToSpeech, text: String, file: File) {
