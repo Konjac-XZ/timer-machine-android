@@ -110,7 +110,7 @@ internal class VolcengineTtsClient(
                 requests.debugRequestsByIndex(),
                 synthesisText.escapeForLog(),
             )
-        val synthesisResult = synthesize(
+        val synthesisResult = synthesizeSse(
             text = synthesisText,
             audioFormat = AUDIO_FORMAT_PCM,
             enableSubtitle = true,
@@ -224,6 +224,48 @@ internal class VolcengineTtsClient(
         }
     }
 
+    private fun synthesizeSse(
+        text: String,
+        audioFormat: String,
+        enableSubtitle: Boolean,
+    ): SynthesisResult {
+        val requestId = UUID.randomUUID().toString()
+        val request = Request.Builder()
+            .url(HTTP_SSE_URL)
+            .header("X-Api-Key", settings.apiKey)
+            .header("X-Api-Resource-Id", settings.resourceId)
+            .header("X-Api-Request-Id", requestId)
+            .post(
+                synthesisPayload(
+                    text = text,
+                    audioFormat = audioFormat,
+                    enableSubtitle = enableSubtitle,
+                ).toRequestBody(JSON_MEDIA_TYPE)
+            )
+            .build()
+
+        okHttpClient.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            Timber
+                .tag(TTS_LOG_TAG)
+                .i(
+                    "HTTP SSE synthesis finished: code=%d requestId=%s logId=%s bodyChars=%d contentType=%s",
+                    response.code,
+                    requestId,
+                    response.header("X-Tt-Logid"),
+                    body.length,
+                    response.header("Content-Type"),
+                )
+            if (!response.isSuccessful) {
+                error(
+                    "Volcengine TTS SSE failed: code=${response.code}, requestId=$requestId, " +
+                        "logId=${response.header("X-Tt-Logid")}, body=$body"
+                )
+            }
+            return parseSseSynthesisResponse(body)
+        }
+    }
+
     private fun synthesisPayload(
         text: String,
         audioFormat: String,
@@ -327,6 +369,94 @@ internal class VolcengineTtsClient(
             .i(
                 "Parsed synthesis response: frames=%d audioFrames=%d subtitleFrames=%d audioBytes=%d finalStatus=%s",
                 frameCount,
+                audioFrameCount,
+                subtitleFrameCount,
+                audioOutput.size(),
+                finalStatus,
+            )
+
+        return SynthesisResult(
+            audio = audioOutput.toByteArray(),
+            subtitles = subtitles,
+        )
+    }
+
+    private fun parseSseSynthesisResponse(body: String): SynthesisResult {
+        val audioOutput = ByteArrayOutputStream()
+        val subtitles = mutableListOf<Subtitle>()
+        var finalStatus: Map<*, *>? = null
+        var event: String? = null
+        val dataLines = mutableListOf<String>()
+        var eventCount = 0
+        var audioFrameCount = 0
+        var subtitleFrameCount = 0
+        val eventCounts = mutableMapOf<String, Int>()
+
+        fun flushEvent() {
+            if (dataLines.isEmpty()) return
+
+            eventCount++
+            val eventName = event.orEmpty()
+            eventCounts[eventName] = eventCounts.getOrDefault(eventName, 0) + 1
+            val data = dataLines.joinToString(separator = "\n")
+            dataLines.clear()
+
+            val frame = JsonReader.of(Buffer().writeUtf8(data)).apply {
+                isLenient = true
+            }.readJsonValue() as? Map<*, *> ?: return
+
+            val hasAudio = frame["data"] is String
+            if (hasAudio) {
+                audioOutput.write(Base64.decode(frame["data"] as String, Base64.DEFAULT))
+                audioFrameCount++
+            }
+            val subtitle = frame.subtitleOrNull()
+            if (subtitle != null) {
+                subtitles += subtitle
+                subtitleFrameCount++
+            } else if (!hasAudio && frame["code"] !is Number) {
+                Timber
+                    .tag(TTS_LOG_TAG)
+                    .i(
+                        "Parsed SSE non-audio frame without subtitle: event=%s keys=%s sentenceType=%s wordsType=%s",
+                        eventName,
+                        frame.keys.joinToString(separator = "|"),
+                        frame["sentence"]?.javaClass?.simpleName,
+                        frame["words"]?.javaClass?.simpleName,
+                    )
+            }
+            if (frame["code"] is Number) {
+                finalStatus = frame
+            }
+        }
+
+        body.lineSequence().forEach { line ->
+            when {
+                line.isEmpty() -> {
+                    flushEvent()
+                    event = null
+                }
+                line.startsWith("event:") -> {
+                    event = line.substringAfter("event:").trim()
+                }
+                line.startsWith("data:") -> {
+                    dataLines += line.substringAfter("data:").trimStart()
+                }
+            }
+        }
+        flushEvent()
+
+        val finalCode = (finalStatus?.get("code") as? Number)?.toInt()
+        if (finalCode != null && finalCode != CODE_OK) {
+            error("Volcengine TTS SSE failed: $finalStatus")
+        }
+
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Parsed SSE synthesis response: events=%d eventCounts=%s audioFrames=%d subtitleFrames=%d audioBytes=%d finalStatus=%s",
+                eventCount,
+                eventCounts,
                 audioFrameCount,
                 subtitleFrameCount,
                 audioOutput.size(),
@@ -490,6 +620,7 @@ internal class VolcengineTtsClient(
 
     private companion object {
         const val HTTP_CHUNKED_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+        const val HTTP_SSE_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse"
         const val TTS_LOG_TAG = "VolcengineTtsClient"
         const val CODE_OK = 20_000_000
         const val COUNTDOWN_CONTEXT_TEXT = "这是倒计时播报。请保持稳定、中性的语气和节奏，不要加入额外感情。"
