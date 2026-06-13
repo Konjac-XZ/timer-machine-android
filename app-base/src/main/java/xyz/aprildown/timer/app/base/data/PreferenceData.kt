@@ -125,6 +125,14 @@ object PreferenceData {
 
     // endregion Show Timer Total Time
 
+    // region Screen Stop Button
+
+    const val KEY_HIDE_SCREEN_STOP_BUTTON = "key_hide_screen_stop_button"
+    val Context.hideScreenStopButton: Boolean
+        get() = safeSharedPreference.getBoolean(KEY_HIDE_SCREEN_STOP_BUTTON, false)
+
+    // endregion Screen Stop Button
+
     // region Week Start
 
     /**

@@ -681,6 +681,9 @@
     <string name="pref_show_timer_total_time">Total Time When Editing</string>
     <string name="pref_show_timer_total_time_on">Show the total time of the timer and groups</string>
     <string name="pref_show_timer_total_time_off">Hide it</string>
+    <string name="pref_hide_screen_stop_button">Hide Stop Button on Run Screen</string>
+    <string name="pref_hide_screen_stop_button_on">Stop button is hidden while running</string>
+    <string name="pref_hide_screen_stop_button_off">Stop button is visible while running</string>
 
     <!--Use the previously generated speech synthesis file instead of synthesizing the voice every time. Similar to caching.-->
     <string name="pref_tts_bakery">Text-to-speech bakery</string>

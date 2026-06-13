@@ -88,6 +88,15 @@
             app:summaryOn="@string/pref_show_timer_total_time_on"
             app:title="@string/pref_show_timer_total_time" />
 
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:icon="@drawable/settings_customize"
+            app:key="key_hide_screen_stop_button"
+            app:singleLineTitle="false"
+            app:summaryOff="@string/pref_hide_screen_stop_button_off"
+            app:summaryOn="@string/pref_hide_screen_stop_button_on"
+            app:title="@string/pref_hide_screen_stop_button" />
+
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/pref_reminder">

@@ -31,6 +31,7 @@ import com.github.deweyreed.tools.utils.ThemeColorUtils
 import android.graphics.Color
 import dagger.hilt.android.AndroidEntryPoint
 import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
+import xyz.aprildown.timer.app.base.data.PreferenceData.hideScreenStopButton
 import xyz.aprildown.timer.app.base.ui.BaseActivity
 import xyz.aprildown.timer.app.base.ui.newDynamicTheme
 import xyz.aprildown.timer.app.base.utils.AppThemeUtils
@@ -100,6 +101,7 @@ class ScreenActivity : BaseActivity() {
         init()
         setUpFullscreen()
         setUpObservers()
+        updateStopButtonVisibility()
 
         bindService(
             MachineService.bindIntent(this),
@@ -290,6 +292,10 @@ class ScreenActivity : BaseActivity() {
         }
     }
 
+    private fun updateStopButtonVisibility() {
+        binding.btnStop.isVisible = !hideScreenStopButton
+    }
+
     private fun startSmoothAnimation() {
         if (!isAnimating) {
             isAnimating = true
@@ -425,6 +431,7 @@ class ScreenActivity : BaseActivity() {
         if (currentStepType == StepType.NORMAL && binding.gradientOverlay.isVisible) {
             startSmoothAnimation()
         }
+        updateStopButtonVisibility()
     }
 
     override fun onPause() {
