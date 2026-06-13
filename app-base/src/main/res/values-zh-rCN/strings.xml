@@ -541,6 +541,7 @@
     <string name="pref_cloud_tts_category_access">鉴权与音色</string>
     <string name="pref_cloud_tts_category_voice">语音表现</string>
     <string name="pref_cloud_tts_category_batching">倒计时批量合成</string>
+    <string name="pref_cloud_tts_category_cache">缓存</string>
     <string name="pref_cloud_tts_api_key">火山引擎 API Key</string>
     <string name="pref_cloud_tts_api_key_summary">启用火山引擎语音合成时必填</string>
     <string name="pref_cloud_tts_api_key_configured">已配置</string>

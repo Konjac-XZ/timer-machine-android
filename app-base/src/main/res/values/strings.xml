@@ -728,6 +728,7 @@
     <string name="pref_cloud_tts_category_access">Access and voice</string>
     <string name="pref_cloud_tts_category_voice">Voice behavior</string>
     <string name="pref_cloud_tts_category_batching">Countdown batching</string>
+    <string name="pref_cloud_tts_category_cache">Cache</string>
     <string name="pref_cloud_tts_api_key">Volcengine API Key</string>
     <string name="pref_cloud_tts_api_key_summary">Required when Volcengine TTS is enabled</string>
     <string name="pref_cloud_tts_api_key_configured">Configured</string>

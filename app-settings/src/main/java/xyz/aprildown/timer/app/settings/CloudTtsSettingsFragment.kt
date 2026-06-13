@@ -2,19 +2,33 @@ package xyz.aprildown.timer.app.settings
 
 import android.os.Bundle
 import android.text.InputType
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import com.github.deweyreed.timer.component.tts.TtsBakery
+import com.github.deweyreed.tools.anko.dp
+import com.github.deweyreed.tools.anko.longSnackbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import xyz.aprildown.timer.app.base.data.PreferenceData
 import xyz.aprildown.timer.app.base.ui.BasePreferenceFragmentCompat
+import xyz.aprildown.timer.component.key.SimpleInputDialog
 import xyz.aprildown.timer.domain.utils.fireAndForget
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import xyz.aprildown.timer.app.base.R as RBase
 
 @AndroidEntryPoint
 class CloudTtsSettingsFragment :
     BasePreferenceFragmentCompat(),
-    Preference.OnPreferenceChangeListener {
+    Preference.OnPreferenceChangeListener,
+    Preference.OnPreferenceClickListener {
+
+    private var ttsPrerenderDialogJob: Job? = null
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.pref_cloud_tts_settings, rootKey)
@@ -64,6 +78,19 @@ class CloudTtsSettingsFragment :
             KEY_CLOUD_TTS_CONTEXT_TEXT -> {
                 clearTtsCache()
             }
+        }
+        return true
+    }
+
+    override fun onPreferenceClick(preference: Preference): Boolean {
+        when (preference.key) {
+            KEY_TTS_PRERENDER -> {
+                showTtsPrerenderDialog()
+            }
+            KEY_TTS_CLEAR_CACHE -> {
+                showTtsClearCacheDialog()
+            }
+            else -> return false
         }
         return true
     }
@@ -126,6 +153,47 @@ class CloudTtsSettingsFragment :
             }
             onPreferenceChangeListener = this@CloudTtsSettingsFragment
         }
+        findPreference<Preference>(KEY_TTS_PRERENDER)?.onPreferenceClickListener = this
+        findPreference<Preference>(KEY_TTS_CLEAR_CACHE)?.onPreferenceClickListener = this
+    }
+
+    private fun showTtsPrerenderDialog() {
+        SimpleInputDialog(requireContext()).show(
+            titleRes = RBase.string.pref_tts_prerender_dialog_title,
+            message = getString(RBase.string.pref_tts_prerender_dialog_message_cloud),
+            hint = getString(RBase.string.pref_tts_prerender_dialog_hint),
+            preFill = DEFAULT_TTS_PRERENDER_COUNT.toString(),
+            inputType = InputType.TYPE_CLASS_NUMBER
+        ) { input ->
+            val count = input.toIntOrNull()
+            if (count == null || count !in 1..MAX_TTS_PRERENDER_COUNT) {
+                view?.longSnackbar(RBase.string.pref_tts_prerender_invalid_input)
+                return@show
+            }
+
+            startTtsPrerendering(count)
+        }
+    }
+
+    private fun startTtsPrerendering(count: Int) {
+        if (TtsBakery.startCountdownPrerendering(requireContext(), count)) {
+            showTtsPrerenderProgressDialog()
+        } else {
+            view?.longSnackbar(RBase.string.pref_tts_prerender_already_running)
+            showTtsPrerenderProgressDialog()
+        }
+    }
+
+    private fun showTtsClearCacheDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(RBase.string.pref_tts_clear_cache)
+            .setMessage(RBase.string.pref_tts_clear_cache_confirmation)
+            .setNegativeButton(RBase.string.cancel, null)
+            .setPositiveButton(RBase.string.ok) { _, _ ->
+                clearTtsCache()
+                view?.longSnackbar(RBase.string.pref_tts_clear_cache_done)
+            }
+            .show()
     }
 
     private fun clearTtsCache() {
@@ -133,6 +201,94 @@ class CloudTtsSettingsFragment :
         fireAndForget {
             TtsBakery.tearDown(context)
         }
+    }
+
+    private fun showTtsPrerenderProgressDialog() {
+        ttsPrerenderDialogJob?.cancel()
+
+        val dialogView = layoutInflater.inflate(
+            android.R.layout.simple_list_item_2,
+            null,
+            false,
+        )
+        val titleView = dialogView.findViewById<TextView>(android.R.id.text1)
+        val progressTextView = dialogView.findViewById<TextView>(android.R.id.text2)
+        val progressBar = ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(RBase.string.pref_tts_prerender_title)
+            .setView(
+                LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    val padding = requireContext().dp(24).toInt()
+                    setPadding(padding, padding, padding, 0)
+                    addView(dialogView)
+                    addView(progressBar)
+                }
+            )
+            .setPositiveButton(RBase.string.ok, null)
+            .create()
+
+        dialog.setOnDismissListener {
+            ttsPrerenderDialogJob?.cancel()
+            ttsPrerenderDialogJob = null
+        }
+        dialog.show()
+
+        ttsPrerenderDialogJob = viewLifecycleOwner.lifecycleScope.launch {
+            TtsBakery.countdownPrerenderState.collectLatest { state ->
+                when (state) {
+                    TtsBakery.CountdownPrerenderState.Idle -> Unit
+                    TtsBakery.CountdownPrerenderState.Batching -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_notification_title)
+                        progressTextView.setText(RBase.string.pref_tts_prerender_cloud_batching)
+                        progressBar.isIndeterminate = true
+                    }
+                    is TtsBakery.CountdownPrerenderState.Running -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_notification_title)
+                        progressTextView.text = getString(
+                            RBase.string.pref_tts_prerender_progress,
+                            state.current,
+                            state.total,
+                        )
+                        progressBar.max = state.total
+                        progressBar.progress = state.current
+                        progressBar.isIndeterminate = state.total == 0
+                    }
+                    is TtsBakery.CountdownPrerenderState.Complete -> {
+                        titleView.text = if (state.failed == 0) {
+                            getString(
+                                RBase.string.pref_tts_prerender_completed,
+                                state.success,
+                                state.total,
+                            )
+                        } else {
+                            getString(
+                                RBase.string.pref_tts_prerender_completed_with_failures,
+                                state.success,
+                                state.total,
+                                state.failed,
+                            )
+                        }
+                        progressTextView.text = null
+                        progressBar.max = state.total
+                        progressBar.progress = state.success
+                        progressBar.isIndeterminate = false
+                    }
+                    TtsBakery.CountdownPrerenderState.FailedToStart -> {
+                        titleView.setText(RBase.string.pref_tts_prerender_failed)
+                        progressTextView.text = null
+                        progressBar.isIndeterminate = false
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        ttsPrerenderDialogJob?.cancel()
+        ttsPrerenderDialogJob = null
     }
 }
 
@@ -146,3 +302,7 @@ private const val KEY_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST =
     PreferenceData.PREF_CLOUD_TTS_MAX_SENTENCES_PER_REQUEST
 private const val KEY_CLOUD_TTS_MAX_CONCURRENCY = PreferenceData.PREF_CLOUD_TTS_MAX_CONCURRENCY
 private const val KEY_CLOUD_TTS_CONTEXT_TEXT = PreferenceData.PREF_CLOUD_TTS_CONTEXT_TEXT
+private const val KEY_TTS_PRERENDER = "key_tts_prerender"
+private const val KEY_TTS_CLEAR_CACHE = "key_tts_clear_cache"
+private const val DEFAULT_TTS_PRERENDER_COUNT = 60
+private const val MAX_TTS_PRERENDER_COUNT = 300

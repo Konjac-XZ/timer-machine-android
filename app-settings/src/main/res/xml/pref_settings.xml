@@ -120,24 +120,6 @@
 
         <Preference
             app:dependency="pref_is_tts_bakery_open"
-            app:icon="@drawable/settings_voice"
-            app:key="key_tts_prerender"
-            app:persistent="false"
-            app:singleLineTitle="false"
-            app:summary="@string/pref_tts_prerender_dialog_message"
-            app:title="@string/pref_tts_prerender_title" />
-
-        <Preference
-            app:dependency="pref_is_tts_bakery_open"
-            app:icon="@drawable/ic_delete"
-            app:key="key_tts_clear_cache"
-            app:persistent="false"
-            app:singleLineTitle="false"
-            app:summary="@string/pref_tts_clear_cache_summary"
-            app:title="@string/pref_tts_clear_cache" />
-
-        <Preference
-            app:dependency="pref_is_tts_bakery_open"
             app:icon="@drawable/settings_code"
             app:key="key_cloud_tts_settings"
             app:persistent="false"
