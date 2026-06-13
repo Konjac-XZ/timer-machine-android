@@ -290,27 +290,13 @@ internal class VolcengineTtsClient(
         while (reader.peek() != JsonReader.Token.END_DOCUMENT) {
             val frame = reader.readJsonValue() as? Map<*, *> ?: continue
             frameCount++
-            val hasAudio = frame["data"] is String
-            if (hasAudio) {
-                val data = frame["data"] as String
+            (frame["data"] as? String)?.let { data ->
                 audioOutput.write(Base64.decode(data, Base64.DEFAULT))
                 audioFrameCount++
             }
-            val subtitle = frame.subtitleOrNull()
-            if (subtitle != null) {
+            frame.subtitleOrNull()?.let { subtitle ->
                 subtitles += subtitle
                 subtitleFrameCount++
-            } else if (!hasAudio && frame["code"] !is Number) {
-                Timber
-                    .tag(TTS_LOG_TAG)
-                    .i(
-                        "Parsed synthesis non-audio frame without subtitle: frame=%d keys=%s sentenceType=%s wordsType=%s event=%s",
-                        frameCount,
-                        frame.keys.joinToString(separator = "|"),
-                        frame["sentence"]?.javaClass?.simpleName,
-                        frame["words"]?.javaClass?.simpleName,
-                        frame["event"],
-                    )
             }
             if (frame["code"] is Number) {
                 finalStatus = frame
@@ -502,7 +488,7 @@ internal class VolcengineTtsClient(
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
         const val DEBUG_WORDS_RADIUS = 5
         const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
-        const val MAX_SENTENCES_PER_TIMED_REQUEST = 1
+        const val MAX_SENTENCES_PER_TIMED_REQUEST = 5
         const val MAX_CONCURRENT_TIMED_REQUESTS = 10
 
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
