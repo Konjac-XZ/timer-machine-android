@@ -277,6 +277,9 @@ private class WelcomingTextToSpeech(
 
     private var initialized = false
     private var pendingText: CharSequence? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var speakToken = 0L
+    private var cachedDoneRunnable: Runnable? = null
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
@@ -302,6 +305,8 @@ private class WelcomingTextToSpeech(
         }
 
         fireAndForget(Dispatchers.Main.immediate) {
+            val currentSpeakToken = ++speakToken
+            clearCachedDoneCallback()
             val isTtsBakeryOpen = application.safeSharedPreference.isTtsBakeryOpen
             val textString = text.toString()
             val speechText = TtsBakery.countdownSpeechText(textString)
@@ -318,6 +323,13 @@ private class WelcomingTextToSpeech(
                     speechText = speechText,
                     isTtsBakeryOpen = isTtsBakeryOpen,
                 )
+            }
+            if (currentSpeakToken != speakToken) {
+                Log.i(
+                    COUNTDOWN_TTS_LOG_TAG,
+                    "WelcomingTts.speak stale text=${textString.toLogText()} token=$currentSpeakToken"
+                )
+                return@fireAndForget
             }
             Timber
                 .tag(TTS_LOG_TAG)
@@ -350,20 +362,35 @@ private class WelcomingTextToSpeech(
                     uri = speechUri,
                     loop = false,
                     audioFocusType = application.storedAudioFocusType,
-                    streamType = streamType
+                    streamType = streamType,
+                    onComplete = {
+                        Log.i(
+                            COUNTDOWN_TTS_LOG_TAG,
+                            "WelcomingTts.cache complete text=${textString.toLogText()}"
+                        )
+                        if (currentSpeakToken != speakToken) return@start
+                        clearCachedDoneCallback()
+                        listener.onDone()
+                    }
                 )
 
-                listener.onStart()
-
-                val doneDelay = duration + 100L
+                val doneDelay = duration + CACHE_PLAYBACK_DONE_FALLBACK_MS
+                val doneRunnable = Runnable {
+                    if (currentSpeakToken != speakToken) return@Runnable
+                    Log.i(
+                        COUNTDOWN_TTS_LOG_TAG,
+                        "WelcomingTts.cache fallback onDone text=${textString.toLogText()}"
+                    )
+                    cachedDoneRunnable = null
+                    listener.onDone()
+                }
+                cachedDoneRunnable = doneRunnable
                 Log.i(
                     COUNTDOWN_TTS_LOG_TAG,
-                    "WelcomingTts.cache schedule onDone text=${textString.toLogText()} delayMs=$doneDelay"
+                    "WelcomingTts.cache schedule fallback onDone text=${textString.toLogText()} " +
+                        "delayMs=$doneDelay"
                 )
-                HandlerHelper.postDelayed(
-                    doneDelay,
-                    listener::onDone
-                )
+                mainHandler.postDelayed(doneRunnable, doneDelay)
 
                 return@fireAndForget
             }
@@ -406,14 +433,23 @@ private class WelcomingTextToSpeech(
 
     fun stop() {
         Log.i(COUNTDOWN_TTS_LOG_TAG, "WelcomingTts.stop")
+        speakToken += 1
+        clearCachedDoneCallback()
         textToSpeech.stop()
         HandlerHelper.remove(listener::onDone)
     }
 
     fun shutdown() {
         Log.i(COUNTDOWN_TTS_LOG_TAG, "WelcomingTts.shutdown")
+        speakToken += 1
+        clearCachedDoneCallback()
         textToSpeech.shutdown()
         HandlerHelper.remove(listener::onDone)
+    }
+
+    private fun clearCachedDoneCallback() {
+        cachedDoneRunnable?.let(mainHandler::removeCallbacks)
+        cachedDoneRunnable = null
     }
 }
 
@@ -483,5 +519,6 @@ private fun getBakedCountUri(context: Context, content: CharSequence): Uri? {
 
 private const val TTS_LOG_TAG = "TtsSpeaker"
 private const val COUNTDOWN_TTS_LOG_TAG = "CountdownTts"
+private const val CACHE_PLAYBACK_DONE_FALLBACK_MS = 1_500L
 
 private fun CharSequence.toLogText(): String = "\"${toString().replace("\n", "\\n")}\""

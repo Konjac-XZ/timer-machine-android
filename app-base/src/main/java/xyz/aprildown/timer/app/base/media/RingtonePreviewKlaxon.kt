@@ -37,17 +37,18 @@ object RingtonePreviewKlaxon {
         loop: Boolean,
         audioFocusType: Int,
         streamType: Int,
+        onComplete: (() -> Unit)? = null,
     ) {
         Log.i(
             COUNTDOWN_TTS_LOG_TAG,
             "RingtonePreviewKlaxon.start uri=$uri loop=$loop focus=$audioFocusType stream=$streamType"
         )
-        stop(context)
         getAsyncRingtonePlayer(context).play(
             ringtoneUri = uri,
             loop = loop,
             audioFocusType = audioFocusType,
             streamType = streamType,
+            onComplete = onComplete,
         )
     }
 
