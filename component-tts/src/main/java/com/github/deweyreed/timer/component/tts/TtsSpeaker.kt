@@ -2,6 +2,7 @@ package com.github.deweyreed.timer.component.tts
 
 import android.app.Application
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
@@ -11,7 +12,6 @@ import android.speech.tts.UtteranceProgressListener
 import android.text.format.DateUtils
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
-import androidx.core.os.bundleOf
 import androidx.core.os.postDelayed
 import com.github.deweyreed.timer.component.tts.TtsSpeaker.onDone
 import com.github.deweyreed.tools.anko.longToast
@@ -304,7 +304,7 @@ private class WelcomingTextToSpeech(
                     context = application,
                     uri = speechUri,
                     loop = false,
-                    audioFocusType = 0, // AudioManager.AUDIOFOCUS_NONE
+                    audioFocusType = application.storedAudioFocusType,
                     streamType = streamType
                 )
 
@@ -323,12 +323,24 @@ private class WelcomingTextToSpeech(
                 return@fireAndForget
             }
 
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .setUsage(
+                    when (streamType) {
+                        AudioManager.STREAM_ALARM -> AudioAttributes.USAGE_ALARM
+                        AudioManager.STREAM_NOTIFICATION -> AudioAttributes.USAGE_NOTIFICATION
+                        AudioManager.STREAM_RING -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
+                        else -> AudioAttributes.USAGE_MEDIA
+                    }
+                )
+                .build()
+
+            textToSpeech.setAudioAttributes(audioAttributes)
+
             textToSpeech.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
-                bundleOf(
-                    TextToSpeech.Engine.KEY_PARAM_STREAM to streamType
-                ),
+                null,
                 text.hashCode().toString()
             )
             if (isTtsBakeryOpen) {
