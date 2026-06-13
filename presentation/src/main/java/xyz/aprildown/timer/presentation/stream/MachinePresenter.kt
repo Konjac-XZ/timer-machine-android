@@ -158,12 +158,31 @@ class MachinePresenter @Inject constructor(
     override fun decreTimer(timerId: Int) {
         timers[timerId]?.run {
             val current = machine.currentIndex
-            if (current == timer.getFirstIndex()) {
+            val firstIndex = timer.getFirstIndex()
+            
+            if (current == firstIndex) {
                 resetTimer(timerId)
             } else {
-                val (index, _) =
-                    getPrevIndexWithStep(timer.steps, timer.loop, machine.currentIndex)
-                moveTimer(timerId, index)
+                var prevIndex = current
+                do {
+                    val (index, _) = getPrevIndexWithStep(timer.steps, timer.loop, prevIndex)
+                    prevIndex = index
+                    
+                    val skip = timer.shouldSkip(prevIndex)
+                    val isFirst = prevIndex == firstIndex
+                    
+                    when {
+                        skip && isFirst -> {
+                            // If the first step should be skipped, reset the timer
+                            resetTimer(timerId)
+                            return@run
+                        }
+                        skip -> continue
+                        else -> break
+                    }
+                } while (true)
+                
+                moveTimer(timerId, prevIndex)
             }
         }
     }
@@ -171,12 +190,31 @@ class MachinePresenter @Inject constructor(
     override fun increTimer(timerId: Int) {
         timers[timerId]?.run {
             val current = machine.currentIndex
-            if (current == timer.getLastIndex()) {
+            val lastIndex = timer.getLastIndex()
+            
+            if (current == lastIndex) {
                 resetTimer(timerId)
             } else {
-                val (index, _) =
-                    getNextIndexWithStep(timer.steps, timer.loop, machine.currentIndex)
-                moveTimer(timerId, index)
+                var nextIndex = current
+                do {
+                    val (index, _) = getNextIndexWithStep(timer.steps, timer.loop, nextIndex)
+                    nextIndex = index
+                    
+                    val skip = timer.shouldSkip(nextIndex)
+                    val isLast = nextIndex == lastIndex
+                    
+                    when {
+                        skip && isLast -> {
+                            // If the last step should be skipped, reset the timer
+                            resetTimer(timerId)
+                            return@run
+                        }
+                        skip -> continue
+                        else -> break
+                    }
+                } while (true)
+                
+                moveTimer(timerId, nextIndex)
             }
         }
     }
