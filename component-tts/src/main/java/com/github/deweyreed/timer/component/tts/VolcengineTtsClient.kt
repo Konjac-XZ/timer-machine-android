@@ -148,6 +148,39 @@ internal class VolcengineTtsClient(
                 synthesisResult.subtitles.debugSubtitlesByIndex(),
                 words.debugWordsAround(index = 0, radius = DEBUG_WORDS_FULL_BATCH_RADIUS),
             )
+        val subtitleSlices = synthesisResult.sliceTimedSpeechBySubtitles(
+            requests = requests,
+            words = words,
+            batchIndex = batchIndex,
+            batchCount = batchCount,
+        )
+        if (subtitleSlices.size == requests.size) {
+            return subtitleSlices
+        }
+
+        Timber
+            .tag(TTS_LOG_TAG)
+            .w(
+                "Timed synthesis subtitles incomplete, falling back to PCM segmentation: batch=%d/%d expected=%d subtitleSlices=%d",
+                batchIndex + 1,
+                batchCount,
+                requests.size,
+                subtitleSlices.size,
+            )
+        return synthesisResult.audio.sliceTimedSpeechByPcmEnergy(
+            requests = requests,
+            batchIndex = batchIndex,
+            batchCount = batchCount,
+            fallback = subtitleSlices,
+        )
+    }
+
+    private fun SynthesisResult.sliceTimedSpeechBySubtitles(
+        requests: List<TimedSpeechRequest>,
+        words: List<SubtitleWord>,
+        batchIndex: Int,
+        batchCount: Int,
+    ): List<TimedSpeech> {
         var wordIndex = 0
         return requests.mapNotNull { request ->
             val startWordIndex = wordIndex
@@ -177,7 +210,7 @@ internal class VolcengineTtsClient(
             }
             TimedSpeech(
                 text = request.text,
-                audio = synthesisResult.audio.slicePcmBySeconds(
+                audio = audio.slicePcmBySeconds(
                     startSeconds = matchedWords.first().startTime,
                     endSeconds = matchedWords.last().endTime,
                     sampleRate = SAMPLE_RATE,
@@ -352,12 +385,14 @@ internal class VolcengineTtsClient(
         while (reader.peek() != JsonReader.Token.END_DOCUMENT) {
             val frame = reader.readJsonValue() as? Map<*, *> ?: continue
             frameCount++
-            logResponseFrame(
-                source = "chunked",
-                frame = frameCount.toString(),
-                event = frame["event"]?.toString(),
-                data = frame,
-            )
+            if (LOG_RESPONSE_FRAMES) {
+                logResponseFrame(
+                    source = "chunked",
+                    frame = frameCount.toString(),
+                    event = frame["event"]?.toString(),
+                    data = frame,
+                )
+            }
             val hasAudio = frame["data"] is String
             if (hasAudio) {
                 val data = frame["data"] as String
@@ -421,12 +456,14 @@ internal class VolcengineTtsClient(
             val frame = JsonReader.of(Buffer().writeUtf8(data)).apply {
                 isLenient = true
             }.readJsonValue() as? Map<*, *> ?: return
-            logResponseFrame(
-                source = "sse",
-                frame = eventCount.toString(),
-                event = eventName,
-                data = frame,
-            )
+            if (LOG_RESPONSE_FRAMES) {
+                logResponseFrame(
+                    source = "sse",
+                    frame = eventCount.toString(),
+                    event = eventName,
+                    data = frame,
+                )
+            }
 
             val hasAudio = frame["data"] is String
             if (hasAudio) {
@@ -752,6 +789,257 @@ internal class VolcengineTtsClient(
         return copyOfRange(start, end).trimPcmSilence()
     }
 
+    private fun ByteArray.sliceTimedSpeechByPcmEnergy(
+        requests: List<TimedSpeechRequest>,
+        batchIndex: Int,
+        batchCount: Int,
+        fallback: List<TimedSpeech>,
+    ): List<TimedSpeech> {
+        val activeRegions = findPcmActiveRegions(sampleRate = SAMPLE_RATE)
+        val splitRegions = activeRegions.splitIntoSpeechRegions(
+            expectedCount = requests.size,
+            audioSize = size,
+        )
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis PCM segmentation: batch=%d/%d expected=%d activeRegions=%d splitRegions=%d activeDetail=%s splitDetail=%s",
+                batchIndex + 1,
+                batchCount,
+                requests.size,
+                activeRegions.size,
+                splitRegions.size,
+                activeRegions.debugPcmRegionsForLog(),
+                splitRegions.debugPcmRegionsForLog(),
+            )
+
+        if (splitRegions.size != requests.size) {
+            Timber
+                .tag(TTS_LOG_TAG)
+                .w(
+                    "Timed synthesis PCM segmentation failed: batch=%d/%d expected=%d actual=%d fallback=%d",
+                    batchIndex + 1,
+                    batchCount,
+                    requests.size,
+                    splitRegions.size,
+                    fallback.size,
+                )
+            return fallback
+        }
+
+        return requests.zip(splitRegions) { request, region ->
+            TimedSpeech(
+                text = request.text,
+                audio = copyOfRange(region.startByte, region.endByte).trimPcmSilence()
+                    .also { slicedAudio ->
+                        Timber
+                            .tag(TTS_LOG_TAG)
+                            .i(
+                                "Timed synthesis PCM slice: batch=%d/%d text=%s start=%.3f end=%.3f rawBytes=%d bytes=%d",
+                                batchIndex + 1,
+                                batchCount,
+                                request.text,
+                                region.startSeconds,
+                                region.endSeconds,
+                                region.endByte - region.startByte,
+                                slicedAudio.size,
+                            )
+                    },
+                sampleRate = SAMPLE_RATE,
+            )
+        }
+    }
+
+    private fun ByteArray.findPcmActiveRegions(sampleRate: Int): List<PcmRegion> {
+        val frameBytes = (sampleRate * PCM_BYTES_PER_SAMPLE * PCM_VAD_FRAME_MILLIS / 1000)
+            .coerceAtLeast(PCM_BYTES_PER_SAMPLE)
+            .alignPcmOffset()
+        val alignedSize = size.alignPcmOffset()
+        if (alignedSize <= 0 || frameBytes <= 0) return emptyList()
+
+        val frames = buildList {
+            var start = 0
+            while (start < alignedSize) {
+                val end = (start + frameBytes).coerceAtMost(alignedSize).alignPcmOffset()
+                if (start < end) {
+                    add(
+                        PcmEnergyFrame(
+                            startByte = start,
+                            endByte = end,
+                            energy = averagePcmAmplitude(start, end),
+                        )
+                    )
+                }
+                start += frameBytes
+            }
+        }
+        val peakEnergy = frames.maxOfOrNull { it.energy } ?: 0
+        if (peakEnergy <= 0) return emptyList()
+
+        val threshold = maxOf(
+            PCM_ENERGY_MIN_THRESHOLD,
+            (peakEnergy * PCM_ENERGY_THRESHOLD_RATIO).toInt(),
+        )
+        val minRegionBytes = (sampleRate * PCM_BYTES_PER_SAMPLE * PCM_ACTIVE_REGION_MIN_MILLIS / 1000)
+            .alignPcmOffset()
+        val mergeGapBytes = (sampleRate * PCM_BYTES_PER_SAMPLE * PCM_ACTIVE_REGION_MERGE_MILLIS / 1000)
+            .alignPcmOffset()
+
+        val rawRegions = mutableListOf<PcmRegion>()
+        var regionStart: Int? = null
+        frames.forEach { frame ->
+            if (frame.energy >= threshold) {
+                if (regionStart == null) regionStart = frame.startByte
+            } else {
+                val start = regionStart
+                if (start != null) {
+                    rawRegions += PcmRegion(startByte = start, endByte = frame.startByte)
+                    regionStart = null
+                }
+            }
+        }
+        regionStart?.let { start ->
+            rawRegions += PcmRegion(startByte = start, endByte = alignedSize)
+        }
+
+        val speechRegions = rawRegions
+            .filter { it.endByte - it.startByte >= minRegionBytes }
+            .mergeClosePcmRegions(maxGapBytes = mergeGapBytes)
+
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis PCM energy scan: audioBytes=%d duration=%.3f frameMs=%d peak=%d threshold=%d rawRegions=%d mergedRegions=%d",
+                size,
+                pcmDurationSeconds(sampleRate = sampleRate),
+                PCM_VAD_FRAME_MILLIS,
+                peakEnergy,
+                threshold,
+                rawRegions.size,
+                speechRegions.size,
+            )
+        return speechRegions
+    }
+
+    private fun ByteArray.averagePcmAmplitude(startByte: Int, endByte: Int): Int {
+        var total = 0L
+        var count = 0
+        var offset = startByte.alignPcmOffset()
+        val end = endByte.coerceAtMost(size).alignPcmOffset()
+        while (offset + 1 < end) {
+            total += pcmAmplitudeAt(offset)
+            count++
+            offset += PCM_BYTES_PER_SAMPLE
+        }
+        return if (count == 0) 0 else (total / count).toInt()
+    }
+
+    private fun List<PcmRegion>.mergeClosePcmRegions(maxGapBytes: Int): List<PcmRegion> {
+        if (isEmpty()) return emptyList()
+        val merged = mutableListOf<PcmRegion>()
+        var current = first()
+        drop(1).forEach { region ->
+            if (region.startByte - current.endByte <= maxGapBytes) {
+                current = current.copy(endByte = region.endByte)
+            } else {
+                merged += current
+                current = region
+            }
+        }
+        merged += current
+        return merged
+    }
+
+    private fun List<PcmRegion>.splitIntoSpeechRegions(
+        expectedCount: Int,
+        audioSize: Int,
+    ): List<PcmRegion> {
+        if (expectedCount <= 0) return emptyList()
+        if (expectedCount == 1) {
+            val region = if (isEmpty()) {
+                PcmRegion(startByte = 0, endByte = audioSize.alignPcmOffset())
+            } else {
+                PcmRegion(startByte = first().startByte, endByte = last().endByte)
+            }
+            return listOf(region.withPcmPadding(audioSize))
+        }
+        if (size >= expectedCount) {
+            return splitByLargestPcmGaps(expectedCount = expectedCount, audioSize = audioSize)
+        }
+        return splitEvenlyByPcmDuration(expectedCount = expectedCount, audioSize = audioSize)
+    }
+
+    private fun List<PcmRegion>.splitByLargestPcmGaps(
+        expectedCount: Int,
+        audioSize: Int,
+    ): List<PcmRegion> {
+        val gapIndexes = zipWithNext()
+            .mapIndexed { index, (left, right) ->
+                PcmGap(index = index, bytes = right.startByte - left.endByte)
+            }
+            .sortedByDescending { it.bytes }
+            .take(expectedCount - 1)
+            .map { it.index }
+            .sorted()
+
+        if (gapIndexes.size != expectedCount - 1) {
+            return splitEvenlyByPcmDuration(expectedCount = expectedCount, audioSize = audioSize)
+        }
+
+        val regions = mutableListOf<PcmRegion>()
+        var segmentStartRegion = 0
+        gapIndexes.forEach { gapIndex ->
+            regions += PcmRegion(
+                startByte = this[segmentStartRegion].startByte,
+                endByte = this[gapIndex].endByte,
+            ).withPcmPadding(audioSize)
+            segmentStartRegion = gapIndex + 1
+        }
+        regions += PcmRegion(
+            startByte = this[segmentStartRegion].startByte,
+            endByte = last().endByte,
+        ).withPcmPadding(audioSize)
+        return regions
+    }
+
+    private fun List<PcmRegion>.splitEvenlyByPcmDuration(
+        expectedCount: Int,
+        audioSize: Int,
+    ): List<PcmRegion> {
+        val alignedAudioSize = audioSize.alignPcmOffset()
+        val startByte = firstOrNull()?.startByte ?: 0
+        val endByte = lastOrNull()?.endByte ?: alignedAudioSize
+        val spanBytes = (endByte - startByte).coerceAtLeast(PCM_BYTES_PER_SAMPLE)
+        return (0 until expectedCount).map { index ->
+            val start = (startByte + spanBytes * index / expectedCount).alignPcmOffset()
+            val end = (startByte + spanBytes * (index + 1) / expectedCount)
+                .alignPcmOffset()
+                .coerceAtLeast(start + PCM_BYTES_PER_SAMPLE)
+                .coerceAtMost(alignedAudioSize)
+            PcmRegion(startByte = start, endByte = end).withPcmPadding(audioSize)
+        }
+    }
+
+    private fun PcmRegion.withPcmPadding(audioSize: Int): PcmRegion {
+        return PcmRegion(
+            startByte = (startByte - PCM_SEGMENT_PADDING_BYTES)
+                .coerceAtLeast(0)
+                .alignPcmOffset(),
+            endByte = (endByte + PCM_SEGMENT_PADDING_BYTES)
+                .coerceAtMost(audioSize)
+                .alignPcmOffset(),
+        )
+    }
+
+    private fun List<PcmRegion>.debugPcmRegionsForLog(): String {
+        if (isEmpty()) return ""
+        val regions = take(DEBUG_PCM_REGION_LIMIT)
+            .joinToString(separator = "|") { region ->
+                "%.3f-%.3f".format(region.startSeconds, region.endSeconds)
+            }
+        return if (size > DEBUG_PCM_REGION_LIMIT) "$regions|...(+${size - DEBUG_PCM_REGION_LIMIT})" else regions
+    }
+
     private fun ByteArray.pcmDurationSeconds(sampleRate: Int): Double {
         return size.toDouble() / (sampleRate * PCM_BYTES_PER_SAMPLE)
     }
@@ -801,6 +1089,28 @@ internal class VolcengineTtsClient(
         val word: String,
     )
 
+    private data class PcmEnergyFrame(
+        val startByte: Int,
+        val endByte: Int,
+        val energy: Int,
+    )
+
+    private data class PcmRegion(
+        val startByte: Int,
+        val endByte: Int,
+    ) {
+        val startSeconds: Double
+            get() = startByte.toDouble() / (SAMPLE_RATE * PCM_BYTES_PER_SAMPLE)
+
+        val endSeconds: Double
+            get() = endByte.toDouble() / (SAMPLE_RATE * PCM_BYTES_PER_SAMPLE)
+    }
+
+    private data class PcmGap(
+        val index: Int,
+        val bytes: Int,
+    )
+
     private companion object {
         const val HTTP_CHUNKED_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
         const val HTTP_SSE_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional/sse"
@@ -821,8 +1131,18 @@ internal class VolcengineTtsClient(
         const val DEBUG_WORDS_FULL_BATCH_RADIUS = 60
         const val TIMESTAMP_MILLIS_THRESHOLD = 1000
         const val LOG_CHUNK_SIZE = 3000
+        const val LOG_RESPONSE_FRAMES = false
         const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
         const val MAX_CONCURRENT_TIMED_REQUESTS = 1
+        const val PCM_VAD_FRAME_MILLIS = 20
+        const val PCM_ENERGY_MIN_THRESHOLD = 160
+        const val PCM_ENERGY_THRESHOLD_RATIO = 0.06
+        const val PCM_ACTIVE_REGION_MIN_MILLIS = 40
+        const val PCM_ACTIVE_REGION_MERGE_MILLIS = 80
+        const val PCM_SEGMENT_PADDING_MILLIS = 80
+        const val PCM_SEGMENT_PADDING_BYTES =
+            SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * PCM_SEGMENT_PADDING_MILLIS / 1000
+        const val DEBUG_PCM_REGION_LIMIT = 24
 
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 

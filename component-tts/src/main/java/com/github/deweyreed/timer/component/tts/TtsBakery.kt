@@ -334,7 +334,6 @@ object TtsBakery {
             runCatching {
                 cloudTtsClient.synthesizeTimedSpeech(
                     texts = pendingTexts,
-                    debugPlaybackContext = context,
                 )
             }.onSuccess { timedSpeechList ->
                 val timedSpeechByText = timedSpeechList.associateBy { it.text }
