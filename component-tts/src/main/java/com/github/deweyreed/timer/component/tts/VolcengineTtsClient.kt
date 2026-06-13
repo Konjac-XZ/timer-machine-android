@@ -6,6 +6,10 @@ import com.squareup.moshi.JsonReader
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -59,11 +63,45 @@ internal class VolcengineTtsClient(
                 synthesisText = asSentenceText(text),
             )
         }
+        val batches = requests.chunked(MAX_SENTENCES_PER_TIMED_REQUEST)
+        val semaphore = Semaphore(MAX_CONCURRENT_TIMED_REQUESTS)
+        Timber
+            .tag(TTS_LOG_TAG)
+            .i(
+                "Timed synthesis batching: texts=%d batches=%d maxSentencesPerRequest=%d maxConcurrency=%d",
+                requests.size,
+                batches.size,
+                MAX_SENTENCES_PER_TIMED_REQUEST,
+                MAX_CONCURRENT_TIMED_REQUESTS,
+            )
+        batches
+            .mapIndexed { batchIndex, batchRequests ->
+                async {
+                    semaphore.withPermit {
+                        synthesizeTimedSpeechBatch(
+                            requests = batchRequests,
+                            batchIndex = batchIndex,
+                            batchCount = batches.size,
+                        )
+                    }
+                }
+            }
+            .awaitAll()
+            .flatten()
+    }
+
+    private fun synthesizeTimedSpeechBatch(
+        requests: List<TimedSpeechRequest>,
+        batchIndex: Int,
+        batchCount: Int,
+    ): List<TimedSpeech> {
         val synthesisText = requests.joinToString(separator = "\n") { it.synthesisText }
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis start: count=%d first=%s last=%s chars=%d",
+                "Timed synthesis batch start: batch=%d/%d count=%d first=%s last=%s chars=%d",
+                batchIndex + 1,
+                batchCount,
                 requests.size,
                 requests.firstOrNull()?.text,
                 requests.lastOrNull()?.text,
@@ -78,7 +116,9 @@ internal class VolcengineTtsClient(
         Timber
             .tag(TTS_LOG_TAG)
             .i(
-                "Timed synthesis response: audioBytes=%d sentences=%d words=%d firstSentence=%s lastSentence=%s wordsPreview=%s",
+                "Timed synthesis batch response: batch=%d/%d audioBytes=%d sentences=%d words=%d firstSentence=%s lastSentence=%s wordsPreview=%s",
+                batchIndex + 1,
+                batchCount,
                 synthesisResult.audio.size,
                 synthesisResult.subtitles.size,
                 words.size,
@@ -87,7 +127,7 @@ internal class VolcengineTtsClient(
                 words.debugWordsAround(index = 0),
             )
         var wordIndex = 0
-        requests.mapNotNull { request ->
+        return requests.mapNotNull { request ->
             val startWordIndex = wordIndex
             val matchedWords = mutableListOf<SubtitleWord>()
             var matchedText = ""
@@ -100,7 +140,9 @@ internal class VolcengineTtsClient(
                 Timber
                     .tag(TTS_LOG_TAG)
                     .w(
-                        "Timed synthesis subtitle mismatch: text=%s normalized=%s actual=%s startWordIndex=%d endWordIndex=%d words=%d nearbyWords=%s",
+                        "Timed synthesis subtitle mismatch: batch=%d/%d text=%s normalized=%s actual=%s startWordIndex=%d endWordIndex=%d words=%d nearbyWords=%s",
+                        batchIndex + 1,
+                        batchCount,
                         request.text,
                         request.normalizedText,
                         matchedText,
@@ -121,7 +163,9 @@ internal class VolcengineTtsClient(
                     Timber
                         .tag(TTS_LOG_TAG)
                         .i(
-                            "Timed synthesis slice: text=%s normalized=%s wordRange=%d..%d words=%s start=%.3f end=%.3f bytes=%d",
+                            "Timed synthesis slice: batch=%d/%d text=%s normalized=%s wordRange=%d..%d words=%s start=%.3f end=%.3f bytes=%d",
+                            batchIndex + 1,
+                            batchCount,
                             request.text,
                             request.normalizedText,
                             startWordIndex,
@@ -419,6 +463,8 @@ internal class VolcengineTtsClient(
         const val TRIM_PADDING_MILLIS = 20
         const val TRIM_PADDING_BYTES = SAMPLE_RATE * PCM_BYTES_PER_SAMPLE * TRIM_PADDING_MILLIS / 1000
         const val DEBUG_WORDS_RADIUS = 5
+        const val MAX_SENTENCES_PER_TIMED_REQUEST = 10
+        const val MAX_CONCURRENT_TIMED_REQUESTS = 10
 
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
