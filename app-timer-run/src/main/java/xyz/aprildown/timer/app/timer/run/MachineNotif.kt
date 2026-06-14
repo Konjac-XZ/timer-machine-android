@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat.Builder
 import xyz.aprildown.timer.app.base.ui.AppNavigator
 import xyz.aprildown.timer.app.base.utils.produceTime
+import xyz.aprildown.timer.app.timer.run.screen.ScreenActivity
 import xyz.aprildown.timer.domain.entities.TimerEntity
 import xyz.aprildown.timer.presentation.stream.StreamState
 import xyz.aprildown.timer.presentation.stream.TimerIndex
@@ -40,6 +41,10 @@ internal abstract class MachineNotif(protected val context: Context) {
     }
 
     protected abstract fun withUpdateEvent(b: Builder, remaining: Long): Builder
+
+    open fun updateContentIntent(): Builder {
+        return builder
+    }
 }
 
 internal class TimerNotif(
@@ -72,7 +77,8 @@ internal class TimerNotif(
             appNavigator = appNavigator,
             timer = TimerEntity(TimerEntity.NULL_ID, "", 0, listOf()),
             state = StreamState.RESET,
-            currentStepName = ""
+            currentStepName = "",
+            screenTimerId = ScreenActivity.showingTimerIdOrNull()
         )
     }
 
@@ -82,7 +88,8 @@ internal class TimerNotif(
             appNavigator = appNavigator,
             timer = timer,
             state = StreamState.RUNNING,
-            currentStepName = timer.getStep(index)?.label ?: ""
+            currentStepName = timer.getStep(index)?.label ?: "",
+            screenTimerId = ScreenActivity.showingTimerIdOrNull()
         )
     }
 
@@ -95,5 +102,15 @@ internal class TimerNotif(
 
     override fun withUpdateEvent(b: Builder, remaining: Long): Builder {
         return updateTimeFunc.invoke(b, remaining)
+    }
+
+    override fun updateContentIntent(): Builder {
+        builder = builder.updateTimerContentIntent(
+            context = context,
+            appNavigator = appNavigator,
+            timerId = timer.id,
+            screenTimerId = ScreenActivity.showingTimerIdOrNull()
+        )
+        return builder
     }
 }

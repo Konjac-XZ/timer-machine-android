@@ -165,7 +165,8 @@ internal fun Context.buildTimerNotificationBuilder(
     appNavigator: AppNavigator,
     timer: TimerEntity,
     state: StreamState,
-    currentStepName: String
+    currentStepName: String,
+    screenTimerId: Int? = null
 ): Builder {
     val res = resources
     val timerId = timer.id
@@ -218,20 +219,16 @@ internal fun Context.buildTimerNotificationBuilder(
         )
     )
 
-    val showTimerIntent = appNavigator.getOneIntent(timerId = timerId, inNewTask = true)
-
-    val stackBuilder = TaskStackBuilder.create(this)
-    stackBuilder.addNextIntentWithParentStack(showTimerIntent)
-    val pi = stackBuilder.getPendingIntent(
-        timerId,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
     return Builder(this, CHANNEL_TIMING)
         .setShowWhen(false)
         .setSmallIcon(RBase.drawable.ic_watch)
         .setContentTitle(title)
-        .setContentIntent(pi)
+        .updateTimerContentIntent(
+            context = this,
+            appNavigator = appNavigator,
+            timerId = timerId,
+            screenTimerId = screenTimerId
+        )
         .setOngoing(true)
         .setAutoCancel(false)
         .setLocalOnly(false)
@@ -245,6 +242,32 @@ internal fun Context.buildTimerNotificationBuilder(
         }
         .withMediaStyleNotification(this)
         .setGroup("time")
+}
+
+internal fun Builder.updateTimerContentIntent(
+    context: Context,
+    appNavigator: AppNavigator,
+    timerId: Int,
+    screenTimerId: Int? = null
+): Builder {
+    if (screenTimerId == timerId) {
+        return setContentIntent(
+            context.pendingActivityIntent(
+                ScreenActivity.intent(context, timerId),
+                Constants.NOTIF_ID_SCREEN
+            )
+        )
+    }
+
+    val showTimerIntent = appNavigator.getOneIntent(timerId = timerId, inNewTask = true)
+    val stackBuilder = TaskStackBuilder.create(context)
+    stackBuilder.addNextIntentWithParentStack(showTimerIntent)
+    return setContentIntent(
+        stackBuilder.getPendingIntent(
+            timerId,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    )
 }
 
 private fun Builder.withMediaStyleNotification(context: Context): Builder {

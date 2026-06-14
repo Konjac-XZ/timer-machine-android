@@ -388,13 +388,24 @@ class MachineService :
     }
 
     override fun closeScreen() {
+        val screenTimerId = ScreenActivity.showingTimerIdOrNull()
         notificationManager.cancel(Constants.NOTIF_ID_SCREEN)
         ScreenActivity.screen?.finish()
         ScreenActivity.closeTimer()
+        screenTimerId?.let { timerId ->
+            updaterMap[timerId]?.updateContentIntent()?.build()?.let {
+                notificationManager.notify(timerId, it)
+            }
+        }
         refreshForegroundNotifContentIntent()
     }
 
     private fun refreshForegroundNotifContentIntent() {
+        ScreenActivity.showingTimerIdOrNull()?.let { timerId ->
+            updaterMap[timerId]?.updateContentIntent()?.build()?.let {
+                notificationManager.notify(timerId, it)
+            }
+        }
         if (foregroundNotifHandler != null) {
             updateForegroundNotif(
                 totalTimersCount = foregroundTotalTimersCount,
