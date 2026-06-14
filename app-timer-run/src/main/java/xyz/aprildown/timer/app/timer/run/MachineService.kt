@@ -287,9 +287,7 @@ class MachineService :
         toForegroundHandler.postDelayed(16) {
             if (id != -1) {
                 foregroundNotifId = id
-                updaterMap[id]?.builder?.build()?.let {
-                    startForeground(foregroundNotifId, it)
-                }
+                updaterMap[id]?.builder?.let { notifyTimerBuilder(id, it) }
             } else {
                 foregroundNotifId = Constants.NOTIF_ID_SERVICE
                 foregroundNotifBuilder?.build()?.let {
@@ -313,23 +311,17 @@ class MachineService :
     override fun begin(timerId: Int) = Unit
 
     override fun started(timerId: Int, index: TimerIndex) {
-        updaterMap[timerId]?.start(index)?.build()?.let {
-            notificationManager.notify(timerId, it)
-        }
+        updaterMap[timerId]?.start(index)?.let { notifyTimerBuilder(timerId, it) }
     }
 
     override fun paused(timerId: Int) {
-        updaterMap[timerId]?.pause()?.build()?.let {
-            notificationManager.notify(timerId, it)
-        }
+        updaterMap[timerId]?.pause()?.let { notifyTimerBuilder(timerId, it) }
     }
 
     override fun updated(timerId: Int, time: Long) {
         // https://stackoverflow.com/a/43385751/5507158
         try {
-            updaterMap[timerId]?.update(time)?.build()?.let {
-                notificationManager.notify(timerId, it)
-            }
+            updaterMap[timerId]?.update(time)?.let { notifyTimerBuilder(timerId, it) }
         } catch (e: Exception) {
             appTracker.trackError(e)
         }
@@ -393,18 +385,14 @@ class MachineService :
         ScreenActivity.screen?.finish()
         ScreenActivity.closeTimer()
         screenTimerId?.let { timerId ->
-            updaterMap[timerId]?.updateContentIntent()?.build()?.let {
-                notificationManager.notify(timerId, it)
-            }
+            updaterMap[timerId]?.updateContentIntent()?.let { notifyTimerBuilder(timerId, it) }
         }
         refreshForegroundNotifContentIntent()
     }
 
     private fun refreshForegroundNotifContentIntent() {
         ScreenActivity.showingTimerIdOrNull()?.let { timerId ->
-            updaterMap[timerId]?.updateContentIntent()?.build()?.let {
-                notificationManager.notify(timerId, it)
-            }
+            updaterMap[timerId]?.updateContentIntent()?.let { notifyTimerBuilder(timerId, it) }
         }
         if (foregroundNotifHandler != null) {
             updateForegroundNotif(
@@ -412,6 +400,15 @@ class MachineService :
                 pausedTimersCount = foregroundPausedTimersCount,
                 theOnlyTimerName = foregroundTheOnlyTimerName
             )
+        }
+    }
+
+    private fun notifyTimerBuilder(timerId: Int, builder: NotificationCompat.Builder) {
+        val notification = builder.build()
+        if (foregroundNotifId == timerId) {
+            startForeground(foregroundNotifId, notification)
+        } else {
+            notificationManager.notify(timerId, notification)
         }
     }
 
