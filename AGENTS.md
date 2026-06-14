@@ -28,6 +28,7 @@
 - Explain Android and Kotlin changes clearly, assuming familiarity with older Java syntax but little Kotlin experience.
 - Keep i18n coverage to English and Simplified Chinese unless explicitly requested otherwise.
 - Unless the user says otherwise, assume the current branch is a messy, experimental branch and automatically commit completed changes.
+- After each commit, check for an available ADB wireless debugging device, rebuild the current project, and install it to that device. In normal use, assume only one device is connected at a time.
 
 ## Testing Guidelines
 - Name unit tests `ClassNameTest` and keep fixtures beside code in `src/test`.
