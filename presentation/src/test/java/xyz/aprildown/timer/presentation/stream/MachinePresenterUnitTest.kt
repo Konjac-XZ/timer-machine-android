@@ -9,6 +9,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.whenever
 import xyz.aprildown.timer.domain.TestData
 import xyz.aprildown.timer.domain.entities.BehaviourEntity
 import xyz.aprildown.timer.domain.entities.BehaviourType
@@ -16,6 +19,7 @@ import xyz.aprildown.timer.domain.entities.FlashlightAction
 import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.domain.entities.TimerEntity
 import xyz.aprildown.timer.domain.entities.TimerMoreEntity
+import xyz.aprildown.timer.domain.repositories.TimerRepository
 import xyz.aprildown.timer.domain.usecases.record.AddTimerStamp
 import xyz.aprildown.timer.domain.usecases.timer.GetTimer
 
@@ -819,6 +823,57 @@ class MachinePresenterUnitTest {
         assertEquals(0, screenClosedCount)
     }
 
+    @Test
+    fun `start temporary timer inserts in-memory timer without loading saved timer`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val timerRepository: TimerRepository = mock()
+        val machine = MachinePresenter(
+            dispatcher,
+            mock(),
+            GetTimer(dispatcher, timerRepository),
+            AddTimerStamp(dispatcher, mock(), mock(), mock()),
+            mock(),
+            mock(),
+        )
+        machine.takeView(MachineTestView())
+        machine.shouldStartMachines = false
+        val timer = TestData.fakeTimerSimpleA.copy(id = -10)
+
+        machine.startTemporaryTimer(timer)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(machine.timers.containsKey(timer.id))
+        verifyNoInteractions(timerRepository)
+
+        machine.resetTimer(timer.id)
+    }
+
+    @Test
+    fun `start saved timer remains repository-backed`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val timerRepository: TimerRepository = mock()
+        val timer = TestData.fakeTimerSimpleA
+        whenever(timerRepository.item(timer.id)).thenReturn(timer)
+        val machine = MachinePresenter(
+            dispatcher,
+            mock(),
+            GetTimer(dispatcher, timerRepository),
+            AddTimerStamp(dispatcher, mock(), mock(), mock()),
+            mock(),
+            mock(),
+        )
+        machine.takeView(MachineTestView())
+        machine.shouldStartMachines = false
+
+        machine.startTimer(timer.id)
+        testScheduler.advanceUntilIdle()
+
+        verify(timerRepository).item(timer.id)
+        assertTrue(machine.timers.containsKey(timer.id))
+
+        machine.resetTimer(timer.id)
+    }
+
     private fun MachinePresenter.addFirstTimer(showNotif: Boolean): Int {
         return TestData.fakeTimerSimpleA.copy(more = TimerMoreEntity(showNotif = showNotif))
             .toMachineTimers(this).id
@@ -912,17 +967,13 @@ class MachinePresenterUnitTest {
             foregroundNotifId = id
         }
 
-        override fun playMusic(uri: Uri, loop: Boolean) {
-        }
+        override fun playMusic(uri: Uri, loop: Boolean) = Unit
 
-        override fun stopMusic() {
-        }
+        override fun stopMusic() = Unit
 
-        override fun startVibrating(pattern: LongArray, repeat: Boolean) {
-        }
+        override fun startVibrating(pattern: LongArray, repeat: Boolean) = Unit
 
-        override fun stopVibrating() {
-        }
+        override fun stopVibrating() = Unit
 
         override fun showScreen(
             timerItem: TimerEntity,
@@ -941,8 +992,7 @@ class MachinePresenterUnitTest {
             contentRes: Int,
             sayMore: Boolean,
             afterDone: (() -> Unit)?
-        ) {
-        }
+        ) = Unit
 
         override fun formatDuration(duration: Long): CharSequence {
             return ""
@@ -952,46 +1002,35 @@ class MachinePresenterUnitTest {
             return ""
         }
 
-        override fun stopReading() {
-        }
+        override fun stopReading() = Unit
 
-        override fun enableTone(tone: Int, count: Int, respectOtherSound: Boolean) {
-        }
+        override fun enableTone(tone: Int, count: Int, respectOtherSound: Boolean) = Unit
 
-        override fun playTone() {
-        }
+        override fun playTone() = Unit
 
-        override fun disableTone() {
-        }
+        override fun disableTone() = Unit
 
         override fun showBehaviourNotification(
             timer: TimerEntity,
             index: TimerIndex,
             duration: Int
-        ) {
-        }
+        ) = Unit
 
-        override fun toggleFlashlight(action: FlashlightAction?, duration: Long) {
-        }
+        override fun toggleFlashlight(action: FlashlightAction?, duration: Long) = Unit
 
-        override fun dismissBehaviourNotification() {
-        }
+        override fun dismissBehaviourNotification() = Unit
 
         override fun finish() = Unit
 
         override fun begin(timerId: Int) = Unit
 
-        override fun started(timerId: Int, index: TimerIndex) {
-        }
+        override fun started(timerId: Int, index: TimerIndex) = Unit
 
-        override fun paused(timerId: Int) {
-        }
+        override fun paused(timerId: Int) = Unit
 
-        override fun updated(timerId: Int, time: Long) {
-        }
+        override fun updated(timerId: Int, time: Long) = Unit
 
-        override fun finished(timerId: Int) {
-        }
+        override fun finished(timerId: Int) = Unit
 
         override fun end(timerId: Int, forced: Boolean) = Unit
     }

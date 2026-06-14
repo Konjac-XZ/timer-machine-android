@@ -81,6 +81,11 @@
     <string name="edit_create_timer">创建计时器</string>
     <string name="edit_edit_timer">编辑计时器</string>
     <string name="edit_default_timer_name">计时器</string>
+    <string name="quick_timer_title">快速计时器</string>
+    <string name="quick_timer_recent_durations">最近时长</string>
+    <string name="quick_timer_no_recent_durations">暂无最近时长</string>
+    <string name="quick_timer_custom_duration">自定义时长</string>
+    <string name="quick_timer_temporary_timer_name">临时计时器</string>
     <string name="edit_step_name">步骤名称</string>
     <string name="edit_default_step_name">步骤</string>
     <string name="edit_default_notifier_name">通知步骤</string>

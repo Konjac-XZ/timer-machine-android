@@ -91,6 +91,11 @@
     <string name="edit_create_timer">Create Timer</string>
     <string name="edit_edit_timer">Edit Timer</string>
     <string name="edit_default_timer_name">Timer</string>
+    <string name="quick_timer_title">Quick Timer</string>
+    <string name="quick_timer_recent_durations">Recent durations</string>
+    <string name="quick_timer_no_recent_durations">No recent durations yet</string>
+    <string name="quick_timer_custom_duration">Custom duration</string>
+    <string name="quick_timer_temporary_timer_name">Temporary Timer</string>
     <string name="edit_step_name">Step Name</string>
     <string name="edit_default_step_name">Step</string>
     <string name="edit_default_notifier_name">Notifier</string>

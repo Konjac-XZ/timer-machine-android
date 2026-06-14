@@ -113,6 +113,7 @@ interface MachineContract {
         fun getTimerStateInfo(id: Int): CurrentTimerInfo?
 
         fun startTimer(timerId: Int, index: TimerIndex? = null)
+        fun startTemporaryTimer(timer: TimerEntity)
         fun pauseTimer(timerId: Int)
         fun moveTimer(timerId: Int, index: TimerIndex)
         fun decreTimer(timerId: Int)

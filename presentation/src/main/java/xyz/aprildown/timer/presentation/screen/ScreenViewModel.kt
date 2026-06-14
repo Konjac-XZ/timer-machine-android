@@ -28,7 +28,7 @@ class ScreenViewModel @Inject constructor(
 
     private val _step: MutableLiveData<StepEntity.Step?> = MutableLiveData()
     val step: LiveData<StepEntity.Step?> = _step.distinctUntilChanged()
-    
+
     // Store the step's total duration for progress calculation
     private val _stepDuration = MutableLiveData<Long>().apply { value = 0L }
     val stepDuration: LiveData<Long> = _stepDuration

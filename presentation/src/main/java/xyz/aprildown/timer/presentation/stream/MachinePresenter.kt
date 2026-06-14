@@ -53,6 +53,9 @@ class MachinePresenter @Inject constructor(
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val timers: ArrayMap<Int, TimerMachinePair> = arrayMapOf()
 
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal var shouldStartMachines: Boolean = true
+
     private val listeners: ArrayMap<Int, MutableList<TimerMachineListener>> = arrayMapOf()
     private val allListeners: MutableList<TimerMachineListener> = mutableListOf()
 
@@ -113,7 +116,9 @@ class MachinePresenter @Inject constructor(
             if (index != null && currentIndex != index && timer.isThisIndexValid(index)) {
                 toIndex(index)
             }
-            start()
+            if (shouldStartMachines) {
+                start()
+            }
         }
 
         if (timers.containsKey(timerId)) {
@@ -147,6 +152,20 @@ class MachinePresenter @Inject constructor(
         }
     }
 
+    override fun startTemporaryTimer(timer: TimerEntity) {
+        require(timer.id < 0) { "Temporary timers must use negative ids." }
+        if (timers.containsKey(timer.id)) return
+
+        val machine = TimerMachine(timer, this@MachinePresenter)
+        timers[timer.id] = TimerMachinePair(timer, machine)
+        if (shouldStartMachines) {
+            machine.start()
+        }
+        fireAndForget(mainDispatcher) {
+            prefRepo.setBoolean(Constants.PREF_HAS_RUNNING_TIMERS, true)
+        }
+    }
+
     override fun pauseTimer(timerId: Int) {
         timers[timerId]?.machine?.pause()
     }
@@ -159,7 +178,7 @@ class MachinePresenter @Inject constructor(
         timers[timerId]?.run {
             val current = machine.currentIndex
             val firstIndex = timer.getFirstIndex()
-            
+
             if (current == firstIndex) {
                 resetTimer(timerId)
             } else {
@@ -167,10 +186,10 @@ class MachinePresenter @Inject constructor(
                 do {
                     val (index, _) = getPrevIndexWithStep(timer.steps, timer.loop, prevIndex)
                     prevIndex = index
-                    
+
                     val skip = timer.shouldSkip(prevIndex)
                     val isFirst = prevIndex == firstIndex
-                    
+
                     when {
                         skip && isFirst -> {
                             // If the first step should be skipped, reset the timer
@@ -181,7 +200,7 @@ class MachinePresenter @Inject constructor(
                         else -> break
                     }
                 } while (true)
-                
+
                 moveTimer(timerId, prevIndex)
             }
         }
@@ -191,7 +210,7 @@ class MachinePresenter @Inject constructor(
         timers[timerId]?.run {
             val current = machine.currentIndex
             val lastIndex = timer.getLastIndex()
-            
+
             if (current == lastIndex) {
                 resetTimer(timerId)
             } else {
@@ -199,10 +218,10 @@ class MachinePresenter @Inject constructor(
                 do {
                     val (index, _) = getNextIndexWithStep(timer.steps, timer.loop, nextIndex)
                     nextIndex = index
-                    
+
                     val skip = timer.shouldSkip(nextIndex)
                     val isLast = nextIndex == lastIndex
-                    
+
                     when {
                         skip && isLast -> {
                             // If the last step should be skipped, reset the timer
@@ -213,7 +232,7 @@ class MachinePresenter @Inject constructor(
                         else -> break
                     }
                 } while (true)
-                
+
                 moveTimer(timerId, nextIndex)
             }
         }
@@ -593,7 +612,9 @@ class MachinePresenter @Inject constructor(
     override fun begin(timerId: Int) {
         timerBeginsAction(timerId)
 
-        taskerEventTrigger.timerStart(timerId)
+        if (!timerId.isTemporaryTimerId()) {
+            taskerEventTrigger.timerStart(timerId)
+        }
 
         listeners[timerId]?.forEach { it.begin(0) }
         allListeners.forEach { it.begin(timerId) }
@@ -648,9 +669,7 @@ class MachinePresenter @Inject constructor(
 
         // If ends normally, stopBehaviours has been called in the [finished],
         // If ends manually, stopBehaviours has been called in the resetTimer.
-        if (!forced ||
-            (timer != null && timer.machine.currentIndex.isTheLastInTimer(timer.timer))
-        ) {
+        if (shouldRecordTimerStamp(timerId = timerId, forced = forced, timer = timer)) {
             // Record if the timer finished normally or is stopped manually at the last step.
             fireAndForget(mainDispatcher) {
                 addTimerStamp.execute(
@@ -662,7 +681,9 @@ class MachinePresenter @Inject constructor(
             }
         }
 
-        taskerEventTrigger.timerEnd(timerId)
+        if (!timerId.isTemporaryTimerId()) {
+            taskerEventTrigger.timerEnd(timerId)
+        }
 
         // toList avoids ConcurrentModificationException.
         listeners[timerId]?.toList()?.forEach { it.end(0, forced) }
@@ -678,6 +699,15 @@ class MachinePresenter @Inject constructor(
 
     override fun beep() {
         view?.playTone()
+    }
+
+    private fun shouldRecordTimerStamp(
+        timerId: Int,
+        forced: Boolean,
+        timer: TimerMachinePair?
+    ): Boolean {
+        return !timerId.isTemporaryTimerId() &&
+            (!forced || timer?.machine?.currentIndex?.isTheLastInTimer(timer.timer) == true)
     }
 
     override fun notifyHalf(halfOption: Int) {
@@ -697,3 +727,5 @@ class MachinePresenter @Inject constructor(
         view?.beginReading(content = content, sayMore = true)
     }
 }
+
+private fun Int.isTemporaryTimerId(): Boolean = this < 0

@@ -27,11 +27,15 @@ import xyz.aprildown.timer.domain.usecases.folder.GetFolders
 import xyz.aprildown.timer.domain.usecases.invoke
 import xyz.aprildown.timer.domain.usecases.record.GetRecords
 import xyz.aprildown.timer.domain.usecases.timer.GetTimerInfo
+import xyz.aprildown.timer.presentation.MainDispatcherRule
 
 class RecordViewModelTest {
 
     @get:Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     private val getRecords: GetRecords = mock()
     private val getFolders: GetFolders = mock()

@@ -21,5 +21,6 @@ interface MainCallback {
 
     interface FragmentCallback {
         fun onFabClick(view: View)
+        fun onFabLongClick(view: View): Boolean = false
     }
 }

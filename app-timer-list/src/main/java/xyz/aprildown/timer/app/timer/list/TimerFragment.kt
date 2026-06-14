@@ -14,7 +14,10 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.edit
 import androidx.core.text.buildSpannedString
 import androidx.core.view.MenuProvider
@@ -42,11 +45,16 @@ import com.github.deweyreed.tools.helper.gone
 import com.github.deweyreed.tools.helper.hasPermissions
 import com.github.deweyreed.tools.helper.show
 import com.github.deweyreed.tools.helper.startActivityOrNothing
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import xyz.aprildown.timer.app.base.data.PreferenceData
+import xyz.aprildown.timer.app.base.data.PreferenceData.addRecentTemporaryDuration
+import xyz.aprildown.timer.app.base.data.PreferenceData.recentTemporaryDurations
 import xyz.aprildown.timer.app.base.data.PreferenceData.showGridTimerList
 import xyz.aprildown.timer.app.base.ui.AppNavigator
 import xyz.aprildown.timer.app.base.ui.ListEmptyView
@@ -57,9 +65,11 @@ import xyz.aprildown.timer.app.base.utils.NavigationUtils.subLevelNavigate
 import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.ShortcutHelper
 import xyz.aprildown.timer.app.base.utils.getDisplayName
+import xyz.aprildown.timer.app.base.utils.produceTime
 import xyz.aprildown.timer.app.timer.list.databinding.FragmentTimerBinding
 import xyz.aprildown.timer.app.timer.list.databinding.ViewTipMissedTimerBinding
 import xyz.aprildown.timer.app.timer.list.databinding.ViewTipWhitelistBinding
+import xyz.aprildown.timer.component.key.DurationPicker
 import xyz.aprildown.timer.domain.entities.FolderEntity
 import xyz.aprildown.timer.domain.entities.FolderSortBy
 import xyz.aprildown.timer.domain.usecases.Fruit
@@ -173,6 +183,79 @@ class TimerFragment :
 
     override fun onFabClick(view: View) {
         viewModel.addNewTimer()
+    }
+
+    override fun onFabLongClick(view: View): Boolean {
+        showQuickTimerDialog()
+        return true
+    }
+
+    private fun showQuickTimerDialog() {
+        val context = requireContext()
+        val prefs = context.safeSharedPreference
+        val recentDurations = prefs.recentTemporaryDurations
+        var dialog: AlertDialog? = null
+
+        fun startTemporaryTimer(durationMs: Long) {
+            dialog?.dismiss()
+            prefs.addRecentTemporaryDuration(durationMs)
+            viewModel.startTemporaryTimer(durationMs)
+        }
+
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = context.dp(24).toInt()
+            setPadding(padding, context.dp(8).toInt(), padding, 0)
+        }
+
+        if (recentDurations.isNotEmpty()) {
+            content.addView(
+                TextView(context).apply {
+                    setText(RBase.string.quick_timer_recent_durations)
+                }
+            )
+            content.addView(
+                ChipGroup(context).apply {
+                    isSingleLine = false
+                    recentDurations.forEach { durationMs ->
+                        addView(
+                            Chip(context).apply {
+                                text = durationMs.produceTime()
+                                isCheckable = false
+                                setOnClickListener {
+                                    startTemporaryTimer(durationMs)
+                                }
+                            }
+                        )
+                    }
+                }
+            )
+        } else {
+            content.addView(
+                TextView(context).apply {
+                    setText(RBase.string.quick_timer_no_recent_durations)
+                }
+            )
+        }
+
+        content.addView(
+            MaterialButton(context).apply {
+                setText(RBase.string.quick_timer_custom_duration)
+                setOnClickListener {
+                    DurationPicker(context) { hours, minutes, seconds ->
+                        startTemporaryTimer(
+                            durationMs = ((hours * 60L + minutes) * 60L + seconds) * 1000L
+                        )
+                    }.show()
+                }
+            }
+        )
+
+        dialog = MaterialAlertDialogBuilder(context)
+            .setTitle(RBase.string.quick_timer_title)
+            .setView(content)
+            .setNegativeButton(RBase.string.cancel, null)
+            .show()
     }
 
     private fun setUpMainActions() {

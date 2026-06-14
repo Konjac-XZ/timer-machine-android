@@ -36,6 +36,7 @@ import xyz.aprildown.timer.domain.usecases.timer.ChangeTimerFolder
 import xyz.aprildown.timer.domain.usecases.timer.DeleteTimer
 import xyz.aprildown.timer.domain.usecases.timer.GetTimer
 import xyz.aprildown.timer.domain.usecases.timer.GetTimerInfoFlow
+import xyz.aprildown.timer.presentation.MainDispatcherRule
 import xyz.aprildown.timer.presentation.StreamMachineIntentProvider
 import xyz.aprildown.timer.presentation.stream.StreamState
 
@@ -44,6 +45,10 @@ class TimerViewModelTest {
     @JvmField
     @Rule
     val instantExecutorRule = InstantTaskExecutorRule()
+
+    @JvmField
+    @Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     private val getTimerInfoFlow: GetTimerInfoFlow = mock()
     private val addTimer: AddTimer = mock()
@@ -192,6 +197,25 @@ class TimerViewModelTest {
         verifyNoMoreInteractions(intentObserver)
 
         verify(intentProvider, times(2)).resetIntent(id)
+
+        verifyNoMoreInteractionsForAll()
+    }
+
+    @Test
+    fun start_temporary_timer() = runTest {
+        val viewModel = getViewModel()
+        val durationMs = 90_000L
+        val startIntent = Intent()
+        whenever(intentProvider.startTemporaryIntent(durationMs)).thenReturn(startIntent)
+
+        viewModel.startTemporaryTimer(durationMs)
+
+        argumentCaptor<Event<Intent>> {
+            verify(intentObserver).onChanged(capture())
+            assertEquals(1, allValues.size)
+            assertTrue(startIntent === firstValue.peekContent())
+        }
+        verify(intentProvider).startTemporaryIntent(durationMs)
 
         verifyNoMoreInteractionsForAll()
     }

@@ -42,9 +42,14 @@ import xyz.aprildown.timer.app.base.utils.ScreenWakeLock
 import xyz.aprildown.timer.app.base.utils.produceHms
 import xyz.aprildown.timer.app.timer.run.receiver.SchedulerReceiver
 import xyz.aprildown.timer.app.timer.run.screen.ScreenActivity
+import xyz.aprildown.timer.domain.entities.CountAction
 import xyz.aprildown.timer.domain.entities.FlashlightAction
 import xyz.aprildown.timer.domain.entities.SchedulerEntity
+import xyz.aprildown.timer.domain.entities.ScreenAction
+import xyz.aprildown.timer.domain.entities.StepEntity
+import xyz.aprildown.timer.domain.entities.StepType
 import xyz.aprildown.timer.domain.entities.TimerEntity
+import xyz.aprildown.timer.domain.entities.TimerMoreEntity
 import xyz.aprildown.timer.domain.utils.AppTracker
 import xyz.aprildown.timer.domain.utils.Constants
 import xyz.aprildown.timer.presentation.stream.MachineContract
@@ -121,6 +126,12 @@ class MachineService :
                 timerId,
                 intent.getTimerIndex()
             )
+            ACTION_START_TEMPORARY -> {
+                val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, 0L)
+                if (durationMs > 0) {
+                    presenter.startTemporaryTimer(createTemporaryTimer(durationMs))
+                }
+            }
             ACTION_PAUSE -> presenter.pauseTimer(timerId)
             ACTION_MOVE -> intent.getTimerIndex()?.let { index ->
                 presenter.moveTimer(timerId, index)
@@ -535,9 +546,31 @@ class MachineService :
         notificationManager.cancel(Constants.NOTIF_ID_NOTIFICATION)
     }
 
+    private fun createTemporaryTimer(durationMs: Long): TimerEntity {
+        val timerName = getString(RBase.string.quick_timer_temporary_timer_name)
+        return TimerEntity(
+            id = nextTemporaryTimerId(),
+            name = timerName,
+            loop = 1,
+            steps = listOf(
+                StepEntity.Step(
+                    label = timerName,
+                    length = durationMs,
+                    behaviour = listOf(
+                        ScreenAction(fullScreen = true).toBehaviourEntity(),
+                        CountAction(fullCountdown = true, beep = false).toBehaviourEntity(),
+                    ),
+                    type = StepType.NORMAL,
+                )
+            ),
+            more = TimerMoreEntity(showNotif = true),
+        )
+    }
+
     companion object {
         private const val ACTION_PREFIX = "COMMAND"
         private const val ACTION_START = "${ACTION_PREFIX}_START"
+        private const val ACTION_START_TEMPORARY = "${ACTION_PREFIX}_START_TEMPORARY"
         private const val ACTION_PAUSE = "${ACTION_PREFIX}_PAUSE"
         private const val ACTION_MOVE = "${ACTION_PREFIX}_MOVE"
         private const val ACTION_DECRE = "${ACTION_PREFIX}_DECRE"
@@ -557,8 +590,10 @@ class MachineService :
         private const val EXTRA_PREFIX = "EXTRA_"
         private const val EXTRA_TIMER_ID = "${EXTRA_PREFIX}ID"
         private const val EXTRA_AMOUNT = "${EXTRA_PREFIX}AMOUNT"
+        private const val EXTRA_DURATION_MS = "${EXTRA_PREFIX}DURATION_MS"
 
         private const val EXTRA_SCHEDULER_ID = "${EXTRA_PREFIX}SCHEDULER_ID"
+        private var temporaryTimerIdSeed = -1
 
         private fun pureIntent(context: Context): Intent =
             Intent(context, MachineService::class.java)
@@ -571,6 +606,10 @@ class MachineService :
             Intent(context, MachineService::class.java).setAction(ACTION_START)
                 .putExtra(EXTRA_TIMER_ID, itemId)
                 .putTimerIndex(index)
+
+        fun startTemporaryTimingIntent(context: Context, durationMs: Long): Intent =
+            pureIntent(context).setAction(ACTION_START_TEMPORARY)
+                .putExtra(EXTRA_DURATION_MS, durationMs)
 
         fun pauseTimingIntent(context: Context, itemId: Int): Intent =
             pureIntent(context).setAction(ACTION_PAUSE)
@@ -616,5 +655,11 @@ class MachineService :
                 .putExtra(EXTRA_TIMER_ID, timerId)
 
         fun bindIntent(context: Context) = pureIntent(context)
+
+        private fun nextTemporaryTimerId(): Int {
+            val id = temporaryTimerIdSeed
+            temporaryTimerIdSeed--
+            return id
+        }
     }
 }
