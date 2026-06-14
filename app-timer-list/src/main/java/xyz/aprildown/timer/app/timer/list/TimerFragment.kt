@@ -45,7 +45,6 @@ import com.github.deweyreed.tools.helper.gone
 import com.github.deweyreed.tools.helper.hasPermissions
 import com.github.deweyreed.tools.helper.show
 import com.github.deweyreed.tools.helper.startActivityOrNothing
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -202,11 +201,27 @@ class TimerFragment :
             viewModel.startTemporaryTimer(durationMs)
         }
 
+        fun switchTimePickerType() {
+            DurationPicker.switchPickerType(context)
+            dialog?.dismiss()
+            showQuickTimerDialog()
+        }
+
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             val padding = context.dp(24).toInt()
             setPadding(padding, context.dp(8).toInt(), padding, 0)
         }
+
+        val pickerLayout = DurationPicker.inflateCurrentPickerLayout(context, content)
+        val pickerView = DurationPicker.findPickerView(pickerLayout)
+        content.addView(
+            pickerLayout,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         if (recentDurations.isNotEmpty()) {
             content.addView(
@@ -238,24 +253,25 @@ class TimerFragment :
             )
         }
 
-        content.addView(
-            MaterialButton(context).apply {
-                setText(RBase.string.quick_timer_custom_duration)
-                setOnClickListener {
-                    DurationPicker(context) { hours, minutes, seconds ->
-                        startTemporaryTimer(
-                            durationMs = ((hours * 60L + minutes) * 60L + seconds) * 1000L
-                        )
-                    }.show()
-                }
-            }
-        )
-
         dialog = MaterialAlertDialogBuilder(context)
             .setTitle(RBase.string.quick_timer_title)
             .setView(content)
+            .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(RBase.string.cancel, null)
+            .setNeutralButton(DurationPicker.getSwitchPickerTypeTextRes(context), null)
             .show()
+
+        dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            val durationMs = DurationPicker.getDurationMs(pickerView)
+            if (durationMs <= 0L) {
+                pickerView.snackbar(RBase.string.edit_at_least_1s)
+            } else {
+                startTemporaryTimer(durationMs)
+            }
+        }
+        dialog?.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+            switchTimePickerType()
+        }
     }
 
     private fun setUpMainActions() {

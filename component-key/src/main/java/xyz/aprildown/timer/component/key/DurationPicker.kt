@@ -1,7 +1,9 @@
 package xyz.aprildown.timer.component.key
 
 import android.content.Context
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.edit
 import com.github.deweyreed.tools.anko.snackbar
@@ -17,8 +19,7 @@ class DurationPicker(
 ) {
 
     fun show() {
-        val currentType: Int =
-            context.safeSharedPreference.getInt(PREF_TIME_PICKER_TYPE, TYPE_PANEL)
+        val currentType: Int = getCurrentPickerType(context)
 
         val dialog = MaterialAlertDialogBuilder(context)
             .setView(
@@ -75,6 +76,61 @@ class DurationPicker(
             }
             dialog.dismiss()
             show()
+        }
+    }
+
+    companion object {
+        fun inflateCurrentPickerLayout(context: Context, parent: ViewGroup): View {
+            return LayoutInflater.from(context).inflate(
+                if (getCurrentPickerType(context) == TYPE_PANEL) {
+                    R.layout.layout_time_picker_panel
+                } else {
+                    R.layout.layout_time_picker_scroll
+                },
+                parent,
+                false
+            )
+        }
+
+        fun findPickerView(pickerLayout: View): View {
+            return requireNotNull(pickerLayout.findViewById(R.id.hmsPicker))
+        }
+
+        fun getDurationMs(pickerView: View): Long {
+            val (hours, minutes, seconds) = when (pickerView) {
+                is ScrollHmsPicker -> Triple(
+                    pickerView.hours,
+                    pickerView.minutes,
+                    pickerView.seconds
+                )
+                is HmsPickerView -> Triple(
+                    pickerView.getHours(),
+                    pickerView.getMinutes(),
+                    pickerView.getSeconds()
+                )
+                else -> error("Unsupported picker view: ${pickerView::class.java.name}")
+            }
+            return ((hours * 60L + minutes) * 60L + seconds) * 1000L
+        }
+
+        fun getSwitchPickerTypeTextRes(context: Context): Int {
+            return if (getCurrentPickerType(context) == TYPE_PANEL) {
+                RBase.string.time_picker_type_scroll
+            } else {
+                RBase.string.time_picker_type_panel
+            }
+        }
+
+        fun switchPickerType(context: Context) {
+            val currentType = getCurrentPickerType(context)
+            val newType = if (currentType == TYPE_SCROLL) TYPE_PANEL else TYPE_SCROLL
+            context.safeSharedPreference.edit {
+                putInt(PREF_TIME_PICKER_TYPE, newType)
+            }
+        }
+
+        private fun getCurrentPickerType(context: Context): Int {
+            return context.safeSharedPreference.getInt(PREF_TIME_PICKER_TYPE, TYPE_PANEL)
         }
     }
 }
