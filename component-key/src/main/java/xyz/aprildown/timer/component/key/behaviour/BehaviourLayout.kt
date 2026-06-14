@@ -32,6 +32,7 @@ class BehaviourLayout @JvmOverloads constructor(
     private val currentBehaviours = mutableListOf<BehaviourChipView>()
 
     var onImageCheck: ((ImageAction) -> Unit)? = null
+    var onBehaviourClick: ((BehaviourEntity) -> Unit)? = null
 
     init {
         orientation = VERTICAL
@@ -56,7 +57,13 @@ class BehaviourLayout @JvmOverloads constructor(
             if (index < currentSize) {
                 currentBehaviours[index].changeBehaviour(behaviourEntity)
             } else {
-                currentBehaviours.add(BehaviourChipView(createNewChip(), behaviourEntity))
+                currentBehaviours.add(
+                    BehaviourChipView(
+                        chip = createNewChip(),
+                        behaviour = behaviourEntity,
+                        onClick = { onBehaviourClick?.invoke(it) }
+                    )
+                )
             }
         }
 
@@ -99,13 +106,17 @@ class BehaviourLayout @JvmOverloads constructor(
 
     private class BehaviourChipView(
         val chip: Chip,
-        private var behaviour: BehaviourEntity
+        private var behaviour: BehaviourEntity,
+        private val onClick: (BehaviourEntity) -> Unit
     ) {
 
         private val context = chip.context
 
         init {
             chip.isCloseIconVisible = false
+            chip.setOnClickListener {
+                onClick(behaviour)
+            }
             updateChipView()
         }
 

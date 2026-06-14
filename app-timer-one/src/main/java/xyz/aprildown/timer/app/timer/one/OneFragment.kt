@@ -37,6 +37,8 @@ import xyz.aprildown.timer.app.timer.one.layout.TweakTimeLayout
 import xyz.aprildown.timer.app.timer.one.step.StepListView
 import xyz.aprildown.timer.component.key.TimePanelLayout
 import xyz.aprildown.timer.component.key.switchItem
+import xyz.aprildown.timer.domain.entities.BehaviourEntity
+import xyz.aprildown.timer.domain.entities.BehaviourType
 import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.presentation.stream.TimerIndex
 import xyz.aprildown.timer.presentation.stream.getNiceLoopString
@@ -162,6 +164,13 @@ class OneFragment :
                 override fun onEditStepTime(index: TimerIndex) {
                     actionUpdateStepTime(index)
                 }
+
+                override fun onBehaviourClick(index: TimerIndex, behaviour: BehaviourEntity) {
+                    if (behaviour.type != BehaviourType.SCREEN) return
+                    val timerId = viewModel.timer.value?.id ?: return
+                    val screenIntent = appNavigator.getTimerScreenIntent(timerId) ?: return
+                    startActivity(screenIntent)
+                }
             }
             imageCheckListener = {
                 startActivity(appNavigator.getImagePreviewIntent(it.data))
@@ -282,14 +291,6 @@ class OneFragment :
 
                 override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                     if (menuItem.itemId != id) return false
-                    val timerId = viewModel.timer.value?.id
-                    if (timerId != null) {
-                        val screenIntent = appNavigator.getTimerScreenIntent(timerId)
-                        if (screenIntent != null) {
-                            startActivity(screenIntent)
-                            return true
-                        }
-                    }
                     toast?.cancel()
                     when (
                         context.safeSharedPreference.getString(

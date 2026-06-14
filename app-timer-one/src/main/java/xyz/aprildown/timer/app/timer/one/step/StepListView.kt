@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.mikepenz.fastadapter.FastAdapter
 import com.mikepenz.fastadapter.IItem
 import com.mikepenz.fastadapter.adapters.ItemAdapter
+import xyz.aprildown.timer.domain.entities.BehaviourEntity
 import xyz.aprildown.timer.domain.entities.ImageAction
 import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.domain.entities.TimerEntity
@@ -23,6 +24,7 @@ class StepListView @JvmOverloads constructor(
         fun onJumpToStep(index: TimerIndex)
         fun onEditStep(index: TimerIndex)
         fun onEditStepTime(index: TimerIndex)
+        fun onBehaviourClick(index: TimerIndex, behaviour: BehaviourEntity)
     }
 
     private val startAdapter: ItemAdapter<VisibleStep> = ItemAdapter()
@@ -43,6 +45,12 @@ class StepListView @JvmOverloads constructor(
 
     var listener: StepLongClickListener? = null
     var imageCheckListener: ((ImageAction) -> Unit)? = null
+    private val behaviourClickListener: (VisibleStep, BehaviourEntity) -> Unit =
+        { item, behaviour ->
+            item.toIndex()?.let { index ->
+                listener?.onBehaviourClick(index, behaviour)
+            }
+        }
 
     init {
         layoutManager = stepLayoutManager
@@ -138,6 +146,7 @@ class StepListView @JvmOverloads constructor(
                     currentPositionCallback = this,
                     stepLongClickListener = this,
                     imageCheckListener = imageCheckListener,
+                    behaviourClickListener = behaviourClickListener,
                 )
             )
         }
@@ -154,6 +163,7 @@ class StepListView @JvmOverloads constructor(
                             currentPositionCallback = this,
                             stepLongClickListener = this,
                             imageCheckListener = imageCheckListener,
+                            behaviourClickListener = behaviourClickListener,
                         )
                     )
                 }
@@ -177,6 +187,7 @@ class StepListView @JvmOverloads constructor(
                                 currentPositionCallback = this,
                                 stepLongClickListener = this,
                                 imageCheckListener = imageCheckListener,
+                                behaviourClickListener = behaviourClickListener,
                             )
                         }
                     )
@@ -196,6 +207,7 @@ class StepListView @JvmOverloads constructor(
                     currentPositionCallback = this,
                     stepLongClickListener = this,
                     imageCheckListener = imageCheckListener,
+                    behaviourClickListener = behaviourClickListener,
                 )
             )
         }

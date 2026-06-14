@@ -15,6 +15,7 @@ import xyz.aprildown.timer.app.base.data.PreferenceData.resolveColor
 import xyz.aprildown.timer.app.base.utils.produceTime
 import xyz.aprildown.timer.app.timer.one.R
 import xyz.aprildown.timer.app.timer.one.databinding.ItemStepStepBinding
+import xyz.aprildown.timer.domain.entities.BehaviourEntity
 import xyz.aprildown.timer.domain.entities.ImageAction
 import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.app.base.R as RBase
@@ -26,6 +27,7 @@ internal class VisibleStep(
     private val currentPositionCallback: CurrentPositionCallback,
     private val stepLongClickListener: OnStepLongClickListener,
     private val imageCheckListener: ((ImageAction) -> Unit)?,
+    private val behaviourClickListener: ((VisibleStep, BehaviourEntity) -> Unit)?,
 ) : AbstractItem<VisibleStep.ViewHolder>() {
 
     override val layoutRes: Int = R.layout.item_step_step
@@ -101,6 +103,9 @@ internal class VisibleStep(
                 setBehaviours(step.behaviour)
                 setEnabledColor(typeColor)
                 onImageCheck = this@VisibleStep.imageCheckListener
+                onBehaviourClick = { behaviour ->
+                    this@VisibleStep.behaviourClickListener?.invoke(this@VisibleStep, behaviour)
+                }
             }
         }
     }
