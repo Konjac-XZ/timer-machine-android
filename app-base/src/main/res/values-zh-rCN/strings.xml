@@ -91,6 +91,9 @@
     <string name="edit_group_end">组结束</string>
     <string name="edit_delete_group">删除组</string>
     <string name="edit_step">编辑步骤</string>
+    <string name="edit_step_color_pick">更改颜色</string>
+    <string name="edit_step_color_reset">使用默认颜色</string>
+    <string name="edit_step_color_dialog_title">步骤颜色</string>
     <string name="edit_add_step">添加新步骤</string>
     <string name="edit_add_normal">普通步骤</string>
     <string name="edit_add_normal_desp">添加一个普通步骤</string>
@@ -491,6 +494,9 @@
     <string name="pref_screen_timing_title">屏幕亮度应用时机</string>
     <string name="pref_screen_timing_title_open">当使用应用时</string>
     <string name="pref_screen_timing_title_running">当使用应用且有计时器运行时</string>
+    <string name="pref_hide_screen_stop_button">隐藏运行屏幕上的停止按钮</string>
+    <string name="pref_hide_screen_stop_button_on">运行时隐藏停止按钮</string>
+    <string name="pref_hide_screen_stop_button_off">运行时显示停止按钮</string>
     <string name="pref_notifier_plus_title">在通知步骤增加时间时</string>
     <string name="pref_notifier_plus_title_return">返回上一步并将时间设为1分钟</string>
     <string name="pref_notifier_plus_title_time">在当前步骤增加时间</string>
