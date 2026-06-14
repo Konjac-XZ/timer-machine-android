@@ -29,6 +29,7 @@
 - Keep i18n coverage to English and Simplified Chinese unless explicitly requested otherwise.
 - Unless the user says otherwise, assume the current branch is a messy, experimental branch and automatically commit completed changes.
 - After each commit, check for an available ADB wireless debugging device, rebuild the current project, and install it to that device. In normal use, assume only one device is connected at a time.
+- When using `rg` from PowerShell, do not pass shell-style path globs such as `component-*` as path arguments; PowerShell may pass them through literally, causing `rg` to miss directories or report invalid paths. Search from the repo root with `rg <pattern> .`, or explicitly enumerate directories with PowerShell before invoking `rg`.
 
 ## Testing Guidelines
 - Name unit tests `ClassNameTest` and keep fixtures beside code in `src/test`.
