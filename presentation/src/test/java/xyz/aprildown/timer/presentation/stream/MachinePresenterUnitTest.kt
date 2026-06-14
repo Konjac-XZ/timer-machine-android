@@ -10,7 +10,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.kotlin.mock
 import xyz.aprildown.timer.domain.TestData
+import xyz.aprildown.timer.domain.entities.BehaviourEntity
+import xyz.aprildown.timer.domain.entities.BehaviourType
 import xyz.aprildown.timer.domain.entities.FlashlightAction
+import xyz.aprildown.timer.domain.entities.StepEntity
 import xyz.aprildown.timer.domain.entities.TimerEntity
 import xyz.aprildown.timer.domain.entities.TimerMoreEntity
 import xyz.aprildown.timer.domain.usecases.record.AddTimerStamp
@@ -26,6 +29,8 @@ class MachinePresenterUnitTest {
 
     private var createdTimerId: Int = -1
     private var canceledTimerId: Int = -1
+    private var screenShownCount: Int = 0
+    private var screenClosedCount: Int = 0
 
     private var prepared = false
 
@@ -792,6 +797,28 @@ class MachinePresenterUnitTest {
         assertFalse(prepared)
     }
 
+    @Test
+    fun `screen remains open when next step also has screen behaviour`() = runTest {
+        val machine = getMachine()
+        val screenBehaviour = BehaviourEntity(BehaviourType.SCREEN)
+        val timer = TimerEntity(
+            id = TestData.fakeTimerId,
+            name = "Screen Timer",
+            loop = 1,
+            steps = listOf(
+                StepEntity.Step("Screen 1", 60_000, listOf(screenBehaviour)),
+                StepEntity.Step("Screen 2", 60_000, listOf(screenBehaviour)),
+            )
+        ).toMachineTimers(machine)
+        val firstIndex = TimerIndex.Step(loopIndex = 0, stepIndex = 0)
+
+        machine.started(timer.id, firstIndex)
+        machine.finished(timer.id)
+
+        assertEquals(1, screenShownCount)
+        assertEquals(0, screenClosedCount)
+    }
+
     private fun MachinePresenter.addFirstTimer(showNotif: Boolean): Int {
         return TestData.fakeTimerSimpleA.copy(more = TimerMoreEntity(showNotif = showNotif))
             .toMachineTimers(this).id
@@ -886,19 +913,15 @@ class MachinePresenterUnitTest {
         }
 
         override fun playMusic(uri: Uri, loop: Boolean) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun stopMusic() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun startVibrating(pattern: LongArray, repeat: Boolean) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun stopVibrating() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun showScreen(
@@ -906,11 +929,11 @@ class MachinePresenterUnitTest {
             currentStepName: String,
             fullScreen: Boolean
         ) {
-            throw IllegalAccessException("Nope")
+            screenShownCount++
         }
 
         override fun closeScreen() {
-            throw IllegalAccessException("Nope")
+            screenClosedCount++
         }
 
         override fun beginReading(
@@ -919,31 +942,26 @@ class MachinePresenterUnitTest {
             sayMore: Boolean,
             afterDone: (() -> Unit)?
         ) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun formatDuration(duration: Long): CharSequence {
-            throw IllegalAccessException("Nope")
+            return ""
         }
 
         override fun formatTime(time: Long): CharSequence {
-            throw IllegalAccessException("Nope")
+            return ""
         }
 
         override fun stopReading() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun enableTone(tone: Int, count: Int, respectOtherSound: Boolean) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun playTone() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun disableTone() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun showBehaviourNotification(
@@ -951,15 +969,12 @@ class MachinePresenterUnitTest {
             index: TimerIndex,
             duration: Int
         ) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun toggleFlashlight(action: FlashlightAction?, duration: Long) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun dismissBehaviourNotification() {
-            throw IllegalAccessException("Nope")
         }
 
         override fun finish() = Unit
@@ -967,19 +982,15 @@ class MachinePresenterUnitTest {
         override fun begin(timerId: Int) = Unit
 
         override fun started(timerId: Int, index: TimerIndex) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun paused(timerId: Int) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun updated(timerId: Int, time: Long) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun finished(timerId: Int) {
-            throw IllegalAccessException("Nope")
         }
 
         override fun end(timerId: Int, forced: Boolean) = Unit

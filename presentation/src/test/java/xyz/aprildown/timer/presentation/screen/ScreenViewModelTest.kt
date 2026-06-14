@@ -80,6 +80,41 @@ class ScreenViewModelTest {
     }
 
     @Test
+    fun `started refreshes step content`() = runTest {
+        val viewModel = getViewModel()
+        val t = TestData.fakeTimerSimpleB
+        val initialIndex = TimerIndex.Step(loopIndex = 1, stepIndex = 0)
+        val nextIndex = TimerIndex.Step(loopIndex = 1, stepIndex = 1)
+        whenever(presenter.getTimerStateInfo(t.id))
+            .thenReturn(
+                MachineContract.CurrentTimerInfo(t, StreamState.RUNNING, initialIndex, 10_000)
+            )
+            .thenReturn(
+                MachineContract.CurrentTimerInfo(t, StreamState.RUNNING, nextIndex, 5_000)
+            )
+        viewModel.setTimerId(t.id)
+        viewModel.setPresenter(presenter)
+
+        viewModel.started(t.id, nextIndex)
+
+        assertEquals(
+            ScreenViewModel.formatStepInfo(
+                timerName = t.name,
+                loopString = nextIndex.getNiceLoopString(max = t.loop),
+                stepName = t.getStep(nextIndex)?.label.toString()
+            ),
+            viewModel.timerStepInfo.value
+        )
+        assertEquals(5_000L, viewModel.timerCurrentTime.value)
+
+        argumentCaptor {
+            verify(stepObserver, org.mockito.kotlin.times(2)).onChanged(capture())
+            assertEquals(t.getStep(initialIndex), firstValue)
+            assertEquals(t.getStep(nextIndex), secondValue)
+        }
+    }
+
+    @Test
     fun stop() = runTest {
         val viewModel = getViewModel()
         val id = TestData.fakeTimerId

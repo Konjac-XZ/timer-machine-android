@@ -56,32 +56,36 @@ class ScreenViewModel @Inject constructor(
         presenter?.getTimerStateInfo(timerId)?.run {
             if (timerEntity.id == timerId && !state.isReset) {
                 timerCurrentTime.value = time
-                val currentStep = timerEntity.getStep(index)
-                _step.value = currentStep
-                _stepDuration.value = currentStep?.length ?: 0L
-                timerStepInfo.value = if (index !is TimerIndex.Group) {
-                    formatStepInfo(
-                        timerName = timerEntity.name,
-                        loopString = index.getNiceLoopString(max = timerEntity.loop),
-                        stepName = currentStep?.label.toString(),
-                    )
-                } else {
-                    val group = timerEntity.getGroup(index)
-                    formatStepInfo(
-                        timerName = buildString {
-                            append(timerEntity.name)
-                            append(" ")
-                            append(index.getNiceLoopString(max = timerEntity.loop))
-                            append(" ")
-                            append(group?.name ?: "")
-                        },
-                        loopString = index.groupStepIndex.getNiceLoopString(max = group?.loop ?: 0),
-                        stepName = currentStep?.label.toString(),
-                    )
-                }
+                updateStep(timerEntity, index)
             } else {
                 _stopEvent.value = Event(Unit)
             }
+        }
+    }
+
+    private fun updateStep(timerEntity: TimerEntity, index: TimerIndex) {
+        val currentStep = timerEntity.getStep(index)
+        _step.value = currentStep
+        _stepDuration.value = currentStep?.length ?: 0L
+        timerStepInfo.value = if (index !is TimerIndex.Group) {
+            formatStepInfo(
+                timerName = timerEntity.name,
+                loopString = index.getNiceLoopString(max = timerEntity.loop),
+                stepName = currentStep?.label.toString(),
+            )
+        } else {
+            val group = timerEntity.getGroup(index)
+            formatStepInfo(
+                timerName = buildString {
+                    append(timerEntity.name)
+                    append(" ")
+                    append(index.getNiceLoopString(max = timerEntity.loop))
+                    append(" ")
+                    append(group?.name ?: "")
+                },
+                loopString = index.groupStepIndex.getNiceLoopString(max = group?.loop ?: 0),
+                stepName = currentStep?.label.toString(),
+            )
         }
     }
 
@@ -107,7 +111,16 @@ class ScreenViewModel @Inject constructor(
 
     override fun begin(timerId: Int) = Unit
 
-    override fun started(timerId: Int, index: TimerIndex) = Unit
+    override fun started(timerId: Int, index: TimerIndex) {
+        presenter?.getTimerStateInfo(this.timerId)?.run {
+            if (timerEntity.id == this@ScreenViewModel.timerId && !state.isReset) {
+                timerCurrentTime.value = time
+                updateStep(timerEntity, index)
+            } else {
+                _stopEvent.value = Event(Unit)
+            }
+        }
+    }
 
     override fun paused(timerId: Int) = Unit
 

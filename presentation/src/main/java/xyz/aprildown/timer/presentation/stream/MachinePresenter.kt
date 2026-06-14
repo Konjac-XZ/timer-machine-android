@@ -285,11 +285,13 @@ class MachinePresenter @Inject constructor(
         stopMachineServiceIfNotRunning()
     }
 
-    private fun stopBehaviours() {
+    private fun stopBehaviours(closeScreen: Boolean = true) {
         view?.run {
             stopMusic()
             stopVibrating()
-            closeScreen()
+            if (closeScreen) {
+                closeScreen()
+            }
             stopReading()
             disableTone()
             dismissBehaviourNotification()
@@ -298,10 +300,10 @@ class MachinePresenter @Inject constructor(
     }
 
     private fun startBehaviours(id: Int, index: TimerIndex) {
-        stopBehaviours()
         timers[id]?.let { (timer, _) ->
             timer.getStep(index)?.let { currentStep ->
                 val stepBehaviours = currentStep.behaviour
+                stopBehaviours(closeScreen = !stepBehaviours.hasScreenBehaviour())
                 stepBehaviours.forEach { behavior ->
                     when (behavior.type) {
                         // Handle screen first. This may help priority.
@@ -392,6 +394,28 @@ class MachinePresenter @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun List<BehaviourEntity>.hasScreenBehaviour(): Boolean {
+        return any { it.type == BehaviourType.SCREEN }
+    }
+
+    private fun nextStepHasScreenBehaviour(timer: TimerEntity, currentIndex: TimerIndex): Boolean {
+        if (currentIndex == timer.getLastIndex()) return false
+
+        var nextIndex: TimerIndex = currentIndex
+        do {
+            nextIndex = getNextIndexWithStep(timer.steps, timer.loop, nextIndex).first
+            val skip = timer.shouldSkip(nextIndex)
+            val isLast = nextIndex == timer.getLastIndex()
+            when {
+                skip && isLast -> return false
+                skip -> continue
+                else -> break
+            }
+        } while (true)
+
+        return timer.getStep(nextIndex)?.behaviour?.hasScreenBehaviour() == true
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
@@ -597,7 +621,10 @@ class MachinePresenter @Inject constructor(
     }
 
     override fun finished(timerId: Int) {
-        stopBehaviours()
+        val shouldCloseScreen = timers[timerId]?.let { (timer, machine) ->
+            !nextStepHasScreenBehaviour(timer, machine.currentIndex)
+        } ?: true
+        stopBehaviours(closeScreen = shouldCloseScreen)
 
         listeners[timerId]?.forEach { it.finished(0) }
         allListeners.forEach { it.finished(timerId) }
