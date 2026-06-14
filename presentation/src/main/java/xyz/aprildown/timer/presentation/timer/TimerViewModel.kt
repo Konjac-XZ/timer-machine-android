@@ -182,6 +182,10 @@ class TimerViewModel @Inject constructor(
         }
     }
 
+    fun startTemporaryTimer(durationMs: Long) {
+        _intentEvent.value = Event(streamMachineIntentProvider.startTemporaryIntent(durationMs))
+    }
+
     // fun plusOneAction(id: Int, state: StreamState) {
     //     if (!state.isReset) {
     //         _intentEvent.value = Event(streamMachineIntentProvider.plusOneIntent(id))

@@ -219,6 +219,14 @@ class MainActivity :
                 fragment.onFabClick(it)
             }
         }
+        binding.mainRoot.fab.setOnLongClickListener {
+            val fragment = supportFragmentManager.getCurrentFragment(R.id.fragmentContainer)
+            if (fragment is MainCallback.FragmentCallback) {
+                fragment.onFabLongClick(it)
+            } else {
+                false
+            }
+        }
         volumeControlStream = storedAudioTypeValue
         binding.mainRoot.toolbar.setNavigationOnClickListener { binding.drawer.open() }
     }

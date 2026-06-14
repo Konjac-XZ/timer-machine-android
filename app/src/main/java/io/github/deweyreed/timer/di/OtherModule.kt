@@ -71,6 +71,10 @@ abstract class OtherModule {
                 override fun adjustTimeIntent(id: Int, amount: Long): Intent {
                     return MachineService.adjustAmountIntent(context, id, amount)
                 }
+
+                override fun startTemporaryIntent(durationMs: Long): Intent {
+                    return MachineService.startTemporaryTimingIntent(context, durationMs)
+                }
             }
         }
 

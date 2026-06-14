@@ -441,6 +441,34 @@ object PreferenceData {
         get() = getBoolean(PREF_GRID_TIMER_LIST, false)
         set(value) = edit { putBoolean(PREF_GRID_TIMER_LIST, value) }
 
+    const val PREF_RECENT_TEMPORARY_DURATIONS = "pref_recent_temporary_durations"
+    var SharedPreferences.recentTemporaryDurations: List<Long>
+        get() = getNonNullString(PREF_RECENT_TEMPORARY_DURATIONS, "")
+            .split(",")
+            .mapNotNull { it.toLongOrNull() }
+            .let(::normalizeRecentTemporaryDurations)
+        set(value) = edit {
+            putString(
+                PREF_RECENT_TEMPORARY_DURATIONS,
+                normalizeRecentTemporaryDurations(value).joinToString(separator = ",")
+            )
+        }
+
+    fun SharedPreferences.addRecentTemporaryDuration(durationMs: Long) {
+        recentTemporaryDurations = normalizeRecentTemporaryDurations(
+            listOf(durationMs) + recentTemporaryDurations
+        )
+    }
+
+    fun normalizeRecentTemporaryDurations(durations: List<Long>): List<Long> {
+        return durations
+            .asSequence()
+            .filter { it > 0L }
+            .distinct()
+            .take(MAX_RECENT_TEMPORARY_DURATIONS)
+            .toList()
+    }
+
     const val PREF_BAKED_COUNT = "pref_baked_count"
     var SharedPreferences.useBakedCount: Boolean
         get() = getBoolean(PREF_BAKED_COUNT, false)
@@ -513,3 +541,5 @@ object PreferenceData {
             contextText = getNonNullString(PREF_CLOUD_TTS_CONTEXT_TEXT, CLOUD_TTS_DEFAULT_CONTEXT_TEXT),
         )
 }
+
+private const val MAX_RECENT_TEMPORARY_DURATIONS = 6
