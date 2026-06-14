@@ -15,6 +15,7 @@ interface AppNavigator {
     ): Intent
 
     fun getOneIntent(timerId: Int, inNewTask: Boolean = false): Intent
+    fun getTimerScreenIntent(timerId: Int): Intent?
     fun getStartTimerShortcutIntent(timerId: Int, openOnClick: Boolean): Intent
     fun getShortcutCreatedIntent(): Intent
     fun getIntroIntent(isOnBoarding: Boolean = false): Intent

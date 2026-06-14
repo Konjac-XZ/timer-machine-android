@@ -40,7 +40,8 @@ internal fun Context.serviceBuilder(
     appNavigator: AppNavigator,
     totalRunningTimerCount: Int,
     pausedTimerCount: Int,
-    theOnlyTimerName: String? = null
+    theOnlyTimerName: String? = null,
+    screenTimerId: Int? = null
 ): Builder {
     val isAllRunning = pausedTimerCount == 0
     val isAllPaused = totalRunningTimerCount == pausedTimerCount
@@ -75,7 +76,16 @@ internal fun Context.serviceBuilder(
     val builder = Builder(this, CHANNEL_SERVICE)
         .setShowWhen(false)
         .setSmallIcon(RBase.drawable.ic_watch)
-        .setContentIntent(pendingActivityIntent(appNavigator.getMainIntent()))
+        .setContentIntent(
+            if (screenTimerId != null) {
+                pendingActivityIntent(
+                    ScreenActivity.intent(this, screenTimerId),
+                    Constants.NOTIF_ID_SCREEN
+                )
+            } else {
+                pendingActivityIntent(appNavigator.getMainIntent())
+            }
+        )
         .setOngoing(true)
         .setAutoCancel(false)
         .setLocalOnly(true)

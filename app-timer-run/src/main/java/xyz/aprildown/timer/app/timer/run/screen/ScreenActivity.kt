@@ -473,6 +473,20 @@ class ScreenActivity : BaseActivity() {
     companion object {
         @SuppressLint("StaticFieldLeak")
         var screen: Activity? = null
+        private var showingTimerId: Int = TimerEntity.NULL_ID
+
+        fun showTimer(id: Int) {
+            showingTimerId = id
+        }
+
+        fun closeTimer() {
+            showingTimerId = TimerEntity.NULL_ID
+        }
+
+        fun isShowingTimer(id: Int): Boolean = showingTimerId == id
+
+        fun showingTimerIdOrNull(): Int? =
+            showingTimerId.takeUnless { it == TimerEntity.NULL_ID }
 
         fun intent(context: Context, id: Int): Intent {
             return Intent(context, ScreenActivity::class.java)

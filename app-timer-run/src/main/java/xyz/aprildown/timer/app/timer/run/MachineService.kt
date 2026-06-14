@@ -92,6 +92,9 @@ class MachineService :
     private var foregroundNotifId: Int = 0
     private var foregroundNotifBuilder: NotificationCompat.Builder? = null
     private val updaterMap = SparseArray<MachineNotif>()
+    private var foregroundTotalTimersCount: Int = 0
+    private var foregroundPausedTimersCount: Int = 0
+    private var foregroundTheOnlyTimerName: String? = null
 
     private var phoneCallReceiver: PhoneCallReceiver? = null
     private var phoneCallPausedTimerIds: List<Int>? = null
@@ -233,7 +236,8 @@ class MachineService :
         foregroundNotifBuilder = serviceBuilder(
             appNavigator = appNavigator,
             totalRunningTimerCount = 0,
-            pausedTimerCount = 0
+            pausedTimerCount = 0,
+            screenTimerId = ScreenActivity.showingTimerIdOrNull()
         )
     }
 
@@ -248,6 +252,10 @@ class MachineService :
         pausedTimersCount: Int,
         theOnlyTimerName: String?
     ) {
+        foregroundTotalTimersCount = totalTimersCount
+        foregroundPausedTimersCount = pausedTimersCount
+        foregroundTheOnlyTimerName = theOnlyTimerName
+
         foregroundNotifHandler?.removeCallbacksAndMessages(null)
         // You'll get 3 frames.
         foregroundNotifHandler?.postDelayed(48) {
@@ -255,7 +263,8 @@ class MachineService :
                 appNavigator = appNavigator,
                 totalRunningTimerCount = totalTimersCount,
                 pausedTimerCount = pausedTimersCount,
-                theOnlyTimerName = theOnlyTimerName
+                theOnlyTimerName = theOnlyTimerName,
+                screenTimerId = ScreenActivity.showingTimerIdOrNull()
             )
             foregroundNotifBuilder = builder
             notificationManager.notify(foregroundNotifId, builder.build())
@@ -359,6 +368,9 @@ class MachineService :
     }
 
     override fun showScreen(timerItem: TimerEntity, currentStepName: String, fullScreen: Boolean) {
+        ScreenActivity.showTimer(timerItem.id)
+        refreshForegroundNotifContentIntent()
+
         val isForeground = AppVisibilityTracker.isAppInForeground()
         if (isForeground) {
             startActivity(ScreenActivity.intent(this, timerItem.id).newTask())
@@ -378,6 +390,18 @@ class MachineService :
     override fun closeScreen() {
         notificationManager.cancel(Constants.NOTIF_ID_SCREEN)
         ScreenActivity.screen?.finish()
+        ScreenActivity.closeTimer()
+        refreshForegroundNotifContentIntent()
+    }
+
+    private fun refreshForegroundNotifContentIntent() {
+        if (foregroundNotifHandler != null) {
+            updateForegroundNotif(
+                totalTimersCount = foregroundTotalTimersCount,
+                pausedTimersCount = foregroundPausedTimersCount,
+                theOnlyTimerName = foregroundTheOnlyTimerName
+            )
+        }
     }
 
     override fun beginReading(

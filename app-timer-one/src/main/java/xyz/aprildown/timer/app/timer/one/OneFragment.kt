@@ -282,6 +282,14 @@ class OneFragment :
 
                 override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
                     if (menuItem.itemId != id) return false
+                    val timerId = viewModel.timer.value?.id
+                    if (timerId != null) {
+                        val screenIntent = appNavigator.getTimerScreenIntent(timerId)
+                        if (screenIntent != null) {
+                            startActivity(screenIntent)
+                            return true
+                        }
+                    }
                     toast?.cancel()
                     when (
                         context.safeSharedPreference.getString(

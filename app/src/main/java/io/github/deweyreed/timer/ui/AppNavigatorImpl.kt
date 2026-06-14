@@ -11,6 +11,7 @@ import xyz.aprildown.timer.app.timer.edit.EditActivity
 import xyz.aprildown.timer.app.timer.list.TimerPicker
 import xyz.aprildown.timer.app.timer.one.OneActivity
 import xyz.aprildown.timer.app.timer.run.PhantomActivity
+import xyz.aprildown.timer.app.timer.run.screen.ScreenActivity
 import xyz.aprildown.timer.component.key.ImagePreviewActivity
 import xyz.aprildown.timer.domain.utils.Constants
 import javax.inject.Inject
@@ -37,6 +38,14 @@ class AppNavigatorImpl @Inject constructor(
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             }
+    }
+
+    override fun getTimerScreenIntent(timerId: Int): Intent? {
+        return if (ScreenActivity.isShowingTimer(timerId)) {
+            ScreenActivity.intent(context, timerId)
+        } else {
+            null
+        }
     }
 
     override fun getStartTimerShortcutIntent(timerId: Int, openOnClick: Boolean): Intent {
